@@ -12,6 +12,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
   <link rel="stylesheet" href="../css/styles.css">
   <style>
     /* ── Capture-specific styles ────────────────────────────── */
@@ -276,7 +279,7 @@
           <div class="rec-dot"></div>
           <span>REC</span>
         </div>
-        <div id="wakeLockBadge" class="badge hidden">
+        <div id="wakeLockBadge" class="badge badge-success hidden">
           <span class="badge-dot"></span>
           <span>WAKE LOCK</span>
         </div>
@@ -299,7 +302,11 @@
       </div>
       <div class="status-item" id="statusDB">
         <div class="status-dot"></div>
-        <span>DB: Conectando...</span>
+        <span>DB: OK</span>
+      </div>
+      <div class="status-item" id="statusSync">
+        <div class="status-dot"></div>
+        <span>Nube: Local</span>
       </div>
     </div>
 

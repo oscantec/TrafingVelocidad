@@ -8,6 +8,7 @@
 import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, deleteTrack } from '../lib/db.js';
 import { haversineDistance, totalDistance, formatDistance, formatDuration, formatSpeed } from '../lib/geo.js';
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
+import { syncTrackToCloud } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -56,6 +57,7 @@ const el = {
   statusAccuracy: $('statusAccuracy'),
   statusPoints: $('statusPoints'),
   statusDB: $('statusDB'),
+  statusSync: $('statusSync'),
   metricSpeed: $('metricSpeed'),
   metricDistance: $('metricDistance'),
   metricTime: $('metricTime'),
@@ -281,6 +283,36 @@ async function stopRecording() {
 
   setState(STATE.STOPPED);
   showToast(`Captura finalizada · ${pointCount} puntos`, 'success');
+
+  // Auto-sync to Supabase
+  syncCurrentTrack();
+}
+
+async function syncCurrentTrack() {
+  if (pointCount === 0 || !currentTrackId) return;
+
+  setStatus(el.statusSync, 'warning', 'Nube: Sincronizando...');
+  
+  try {
+    const points = await getTrackPoints(currentTrackId);
+    const tracks = await getAllTracks();
+    const track = tracks.find(t => t.id === currentTrackId);
+
+    if (!track) return;
+
+    const result = await syncTrackToCloud(track, points);
+    
+    if (result.success) {
+      setStatus(el.statusSync, 'active', 'Nube: Sincronizado');
+      showToast('Recorrido sincronizado a la nube', 'success');
+    } else {
+      setStatus(el.statusSync, 'error', 'Nube: Error');
+      showToast('Error al sincronizar con la nube', 'error');
+    }
+  } catch (err) {
+    console.error('[Sync] Error:', err);
+    setStatus(el.statusSync, 'error', 'Nube: Error');
+  }
 }
 
 function handlePause() {
