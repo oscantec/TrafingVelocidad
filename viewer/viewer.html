@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visor & Segmentación — TrafingVelocidad</title>
+  <meta name="description" content="Visor de tracks GPS y procesamiento de segmentación por tramos — NextCan Tráfico">
+  
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    /* ── Viewer-specific styles ─────────────────────────────── */
+    .viewer-layout {
+      display: grid;
+      grid-template-columns: 440px 1fr;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .viewer-panel {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+
+    .viewer-panel-section {
+      padding: var(--sp-lg) var(--sp-xl);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .viewer-map {
+      position: relative;
+    }
+
+    #viewerMap {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Track Selector */
+    .track-selector {
+      display: flex;
+      gap: var(--sp-sm);
+    }
+
+    .track-selector select {
+      flex: 1;
+      padding: var(--sp-sm) var(--sp-md);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-primary);
+      font-size: var(--fs-xs);
+      font-family: var(--font-mono);
+    }
+
+    .track-selector select:focus {
+      border-color: var(--accent);
+    }
+
+    /* Nodes List */
+    .nodes-list {
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: var(--sp-md);
+    }
+
+    .node-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-xs) var(--sp-sm);
+      font-size: var(--fs-xs);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .node-item:hover {
+      background: var(--surface-hover);
+    }
+
+    .node-item .node-name {
+      font-family: var(--font-sans);
+      font-weight: 500;
+    }
+
+    .node-item .node-coords {
+      color: var(--text-muted);
+      font-size: 10px;
+    }
+
+    .node-item .node-dist {
+      font-weight: 600;
+    }
+
+    .node-item .node-dist.far {
+      color: var(--warning);
+    }
+
+    .node-item .node-dist.near {
+      color: var(--success);
+    }
+
+    /* Segments Table */
+    .segments-table-wrap {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: auto;
+    }
+
+    /* Summary Metrics */
+    .summary-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      margin-top: var(--sp-md);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+
+    .summary-metric {
+      background: var(--surface);
+      padding: var(--sp-md);
+      text-align: center;
+    }
+
+    .summary-metric .label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 600;
+    }
+
+    .summary-metric .value {
+      font-family: var(--font-mono);
+      font-size: var(--fs-lg);
+      font-weight: 700;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    .summary-metric .unit {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Process button */
+    .process-actions {
+      display: flex;
+      gap: var(--sp-sm);
+      margin-top: var(--sp-lg);
+    }
+
+    /* Threshold input */
+    .threshold-row {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      margin-top: var(--sp-md);
+    }
+
+    .threshold-row input[type="number"] {
+      width: 80px;
+      padding: var(--sp-xs) var(--sp-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: var(--fs-xs);
+      text-align: center;
+    }
+
+    .threshold-row input[type="number"]:focus {
+      border-color: var(--accent);
+    }
+
+    .threshold-row label {
+      font-size: var(--fs-xs);
+      color: var(--text-secondary);
+    }
+
+    /* Tabs */
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-tab {
+      flex: 1;
+      padding: var(--sp-md);
+      text-align: center;
+      font-size: var(--fs-xs);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      transition: all var(--t-fast);
+      cursor: pointer;
+    }
+
+    .panel-tab:hover {
+      color: var(--text-secondary);
+      background: var(--surface-alt);
+    }
+
+    .panel-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Map Legend */
+    .map-legend {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 1000;
+    }
+
+    /* Segment row highlight */
+    .data-table tbody tr {
+      cursor: pointer;
+    }
+
+    .data-table tbody tr.highlighted {
+      background: var(--accent-dim);
+    }
+
+    @media (max-width: 900px) {
+      .viewer-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 50% 50%;
+      }
+
+      .viewer-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
+          <div class="logo-mark">N</div>
+          <div class="logo-text">
+            Visor
+            <span>Segmentación</span>
+          </div>
+        </a>
+      </div>
+      <div class="flex items-center gap-md">
+        <div id="processBadge" class="badge hidden">
+          <span class="badge-dot"></span>
+          <span></span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Split Layout -->
+    <div class="viewer-layout app-main">
+      <!-- Left Panel -->
+      <div class="viewer-panel">
+        <!-- Tabs -->
+        <div class="panel-tabs">
+          <button class="panel-tab active" data-tab="tab-data" id="tabData">📁 Datos</button>
+          <button class="panel-tab" data-tab="tab-segments" id="tabSegments">📊 Tramos</button>
+        </div>
+
+        <!-- Tab: Data Loading -->
+        <div class="tab-content active" id="tab-data">
+          <!-- Track Source -->
+          <div class="viewer-panel-section">
+            <div class="section-header">
+              <div class="section-icon">📍</div>
+              <h2>Track GPS</h2>
+            </div>
+
+            <!-- From IndexedDB -->
+            <div class="form-group">
+              <label class="form-label">Desde Base Local</label>
+              <div class="track-selector">
+                <select id="trackSelect">
+                  <option value="">— Seleccionar recorrido —</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" id="btnRefreshTracks" title="Refrescar">↻</button>
+              </div>
+            </div>
+
+            <!-- From File -->
+            <div class="form-group">
+              <label class="form-label">O Importar Archivo</label>
+              <div class="file-input-wrapper">
+                <input type="file" accept=".gpx,.json" id="trackFileInput">
+                <div class="file-label">
+                  Arrastra un archivo <strong>.GPX</strong> o <strong>.JSON</strong>
+                </div>
+              </div>
+            </div>
+
+            <div id="trackInfo" class="hidden">
+              <div class="summary-metrics">
+                <div class="summary-metric">
+                  <div class="label">Puntos</div>
+                  <div class="value" id="infoPoints">—</div>
+                </div>
+                <div class="summary-metric">
+                  <div class="label">Distancia</div>
+                  <div class="value" id="infoDistance">—</div>
+                  <div class="unit">km</div>
+                </div>
+                <div class="summary-metric">
+                  <div class="label">Duración</div>
+                  <div class="value" id="infoDuration">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reference Nodes -->
+          <div class="viewer-panel-section">
+            <div class="section-header">
+              <div class="section-icon">🎯</div>
+              <h2>Nodos de Referencia</h2>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Cargar CSV / JSON</label>
+              <div class="file-input-wrapper">
+                <input type="file" accept=".csv,.json,.txt" id="nodesFileInput">
+                <div class="file-label">
+                  Formato: <strong>id, name, lat, lng</strong>
+                </div>
+              </div>
+            </div>
+
+            <div id="nodesInfo" class="hidden">
+              <div class="badge badge-success mb-md">
+                <span class="badge-dot"></span>
+                <span id="nodesCount">0</span> nodos cargados
+              </div>
+              <div class="nodes-list" id="nodesList"></div>
+            </div>
+          </div>
+
+          <!-- Process -->
+          <div class="viewer-panel-section">
+            <div class="section-header">
+              <div class="section-icon">⚡</div>
+              <h2>Procesar</h2>
+            </div>
+
+            <div class="threshold-row">
+              <label>Umbral de cercanía:</label>
+              <input type="number" id="thresholdInput" value="50" min="1" max="2000" step="10">
+              <span class="text-xs text-muted">metros</span>
+            </div>
+
+            <div class="process-actions">
+              <button class="btn btn-primary w-full" id="btnProcess" disabled>
+                ⚡ Segmentar Track
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab: Segments Results -->
+        <div class="tab-content" id="tab-segments">
+          <div class="viewer-panel-section" id="segmentsSummary" style="display:none;">
+            <div class="section-header">
+              <div class="section-icon">📊</div>
+              <h2>Resumen General</h2>
+            </div>
+            <div class="summary-metrics">
+              <div class="summary-metric">
+                <div class="label">Tramos</div>
+                <div class="value" id="summarySegments">—</div>
+              </div>
+              <div class="summary-metric">
+                <div class="label">Dist. Total</div>
+                <div class="value" id="summaryDistance">—</div>
+                <div class="unit">km</div>
+              </div>
+              <div class="summary-metric">
+                <div class="label">Vel. Media</div>
+                <div class="value" id="summaryAvgSpeed">—</div>
+                <div class="unit">km/h</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="segments-table-wrap">
+            <div id="noSegments" class="empty-state">
+              <div class="empty-state-icon">📊</div>
+              <h3>Sin tramos</h3>
+              <p>Carga un track y nodos de referencia, luego presiona "Segmentar Track"</p>
+            </div>
+
+            <table class="data-table hidden" id="segmentsTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Color</th>
+                  <th>Nodo Inicio</th>
+                  <th>Nodo Fin</th>
+                  <th>Distancia</th>
+                  <th>Tiempo</th>
+                  <th>Vel. Media</th>
+                  <th>Vel. Máx</th>
+                  <th>Puntos</th>
+                </tr>
+              </thead>
+              <tbody id="segmentsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Map -->
+      <div class="viewer-map">
+        <div id="viewerMap"></div>
+        <div class="map-legend" id="mapLegend"></div>
+      </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script type="module" src="viewer.js"></script>
+</body>
+</html>

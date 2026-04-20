@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrafingVelocidad — NextCan Tráfico</title>
+  <meta name="description" content="Sistema de Tracking GPS y Segmentación de Tramos para ingeniería de transporte — NextCan Tráfico">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .landing-hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--sp-3xl) var(--sp-xl);
+    }
+
+    .landing-title {
+      text-align: center;
+      margin-bottom: var(--sp-3xl);
+      animation: slide-up 0.6s var(--ease-out);
+    }
+
+    .landing-title h1 {
+      font-size: var(--fs-3xl);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: var(--sp-md);
+    }
+
+    .landing-title h1 em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .landing-title p {
+      font-size: var(--fs-base);
+      color: var(--text-secondary);
+      max-width: 500px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    .version-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-sm);
+      padding: 4px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      font-size: var(--fs-xs);
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-bottom: var(--sp-xl);
+    }
+
+    .version-tag .dot {
+      width: 5px;
+      height: 5px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    .module-card .module-features {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-sm);
+      justify-content: center;
+      margin-top: var(--sp-lg);
+    }
+
+    .module-card .feature-tag {
+      padding: 3px 10px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-full);
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <div class="logo-mark">N</div>
+        <div class="logo-text">
+          TrafingVelocidad
+          <span>NextCan Tráfico</span>
+        </div>
+      </div>
+      <div class="badge badge-accent">
+        <span class="badge-dot"></span>
+        Sistema de Velocidad
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="landing-hero">
+        <div class="landing-title">
+          <div class="version-tag">
+            <span class="dot"></span>
+            v1.0.0
+          </div>
+          <h1>Tracking & <em>Segmentación</em></h1>
+          <p>
+            Captura recorridos GPS de alta precisión y segmenta tramos 
+            automáticamente con nodos de referencia. Diseñado para 
+            ingeniería de transporte.
+          </p>
+        </div>
+
+        <div class="module-grid">
+          <!-- Module 1: Capture -->
+          <a href="capture/capture.html" class="module-card card-hover" id="module-capture">
+            <div class="module-icon"><span>📡</span></div>
+            <h2>Captura</h2>
+            <p>
+              Tracking GPS en tiempo real con persistencia local. 
+              Exporta GPX y sincroniza con backend.
+            </p>
+            <div class="module-features">
+              <span class="feature-tag">GPS Hi-Res</span>
+              <span class="feature-tag">IndexedDB</span>
+              <span class="feature-tag">Wake Lock</span>
+              <span class="feature-tag">GPX Export</span>
+            </div>
+          </a>
+
+          <!-- Module 2: Viewer -->
+          <a href="viewer/viewer.html" class="module-card card-hover" id="module-viewer">
+            <div class="module-icon"><span>📊</span></div>
+            <h2>Visor</h2>
+            <p>
+              Carga tracks y nodos de referencia. Segmenta tramos 
+              automáticamente con métricas de ingeniería.
+            </p>
+            <div class="module-features">
+              <span class="feature-tag">Haversine</span>
+              <span class="feature-tag">Segmentar</span>
+              <span class="feature-tag">Leaflet</span>
+              <span class="feature-tag">Métricas</span>
+            </div>
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      NextCan Tráfico · TrafingVelocidad v1.0.0 · Sistema de Tracking y Segmentación
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Captura GPS — TrafingVelocidad</title>
+  <meta name="description" content="Módulo de captura GPS de alta precisión con persistencia local — NextCan Tráfico">
+  
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    /* ── Capture-specific styles ────────────────────────────── */
+    .capture-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr auto auto;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Status Bar */
+    .capture-status {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-xl);
+      padding: var(--sp-sm) var(--sp-xl);
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+      font-size: var(--fs-xs);
+      overflow-x: auto;
+    }
+
+    /* Metrics */
+    .capture-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .capture-metric {
+      background: var(--bg-secondary);
+      padding: var(--sp-md) var(--sp-lg);
+      text-align: center;
+    }
+
+    .capture-metric .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .capture-metric .metric-value {
+      font-family: var(--font-mono);
+      font-size: var(--fs-xl);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .capture-metric .metric-unit {
+      font-size: var(--fs-xs);
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+    }
+
+    .capture-metric.highlight .metric-value {
+      color: var(--accent);
+    }
+
+    /* Map */
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .capture-map {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    #captureMap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Controls */
+    .capture-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sp-md);
+      padding: var(--sp-lg) var(--sp-xl);
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-record {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--t-fast);
+      border: 3px solid transparent;
+      position: relative;
+    }
+
+    .btn-record::after {
+      display: none;
+    }
+
+    .btn-record:hover {
+      transform: scale(1.05);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .btn-record:active {
+      transform: scale(0.95);
+    }
+
+    .btn-record.recording {
+      background: var(--danger);
+      animation: recording-pulse 1.5s ease-in-out infinite;
+    }
+
+    .btn-record .rec-icon {
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: all var(--t-fast);
+    }
+
+    .btn-record.recording .rec-icon {
+      border-radius: var(--r-sm);
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Actions Bar */
+    .capture-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-sm) var(--sp-xl);
+      background: var(--surface-alt);
+      border-top: 1px solid var(--border);
+    }
+
+    .track-name-input {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      padding: var(--sp-xs) var(--sp-md);
+      font-size: var(--fs-xs);
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      width: 200px;
+    }
+
+    .track-name-input:focus {
+      border-color: var(--accent);
+    }
+
+    /* GPS Error overlay */
+    .gps-error-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-2xl);
+      text-align: center;
+      z-index: 1000;
+      max-width: 340px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .gps-error-overlay h3 {
+      color: var(--danger);
+      margin-bottom: var(--sp-md);
+    }
+
+    .gps-error-overlay p {
+      color: var(--text-secondary);
+      font-size: var(--fs-sm);
+      margin-bottom: var(--sp-lg);
+      line-height: 1.6;
+    }
+
+    /* Tracks List */
+    .saved-tracks {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height var(--t-slow);
+    }
+
+    .saved-tracks.open {
+      max-height: 300px;
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+    }
+
+    .saved-track-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-sm) var(--sp-xl);
+      border-bottom: 1px solid var(--border);
+      font-size: var(--fs-xs);
+      transition: background var(--t-fast);
+    }
+
+    .saved-track-item:hover {
+      background: var(--surface-hover);
+    }
+
+    .saved-track-item .track-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .saved-track-item .track-info .track-title {
+      font-weight: 600;
+    }
+
+    .saved-track-item .track-info .track-meta {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+
+    @media (max-width: 600px) {
+      .capture-metrics {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
+          <div class="logo-mark">N</div>
+          <div class="logo-text">
+            Captura
+            <span>GPS Tracking</span>
+          </div>
+        </a>
+      </div>
+      <div class="flex items-center gap-md">
+        <div id="recordingBadge" class="recording-indicator hidden">
+          <div class="rec-dot"></div>
+          <span>REC</span>
+        </div>
+        <div id="wakeLockBadge" class="badge hidden">
+          <span class="badge-dot"></span>
+          <span>WAKE LOCK</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Status Indicators -->
+    <div class="capture-status">
+      <div class="status-item" id="statusGPS">
+        <div class="status-dot"></div>
+        <span>GPS: Esperando...</span>
+      </div>
+      <div class="status-item" id="statusAccuracy">
+        <div class="status-dot"></div>
+        <span>Precisión: --</span>
+      </div>
+      <div class="status-item" id="statusPoints">
+        <div class="status-dot"></div>
+        <span>Puntos: 0</span>
+      </div>
+      <div class="status-item" id="statusDB">
+        <div class="status-dot"></div>
+        <span>DB: Conectando...</span>
+      </div>
+    </div>
+
+    <!-- Live Metrics -->
+    <div class="capture-metrics">
+      <div class="capture-metric highlight">
+        <div class="metric-label">Velocidad</div>
+        <div class="metric-value" id="metricSpeed">0.0</div>
+        <div class="metric-unit">km/h</div>
+      </div>
+      <div class="capture-metric">
+        <div class="metric-label">Distancia</div>
+        <div class="metric-value" id="metricDistance">0.00</div>
+        <div class="metric-unit">km</div>
+      </div>
+      <div class="capture-metric">
+        <div class="metric-label">Tiempo</div>
+        <div class="metric-value mono" id="metricTime">00:00:00</div>
+        <div class="metric-unit">&nbsp;</div>
+      </div>
+      <div class="capture-metric">
+        <div class="metric-label">Vel. Media</div>
+        <div class="metric-value" id="metricAvgSpeed">0.0</div>
+        <div class="metric-unit">km/h</div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <main class="app-main">
+      <div class="capture-map" style="position:relative;">
+        <div id="captureMap"></div>
+        <div id="gpsErrorOverlay" class="gps-error-overlay hidden">
+          <h3>⚠ Sin acceso GPS</h3>
+          <p id="gpsErrorMessage">
+            Se requiere permiso de ubicación para capturar recorridos.
+          </p>
+          <button class="btn btn-primary btn-sm" onclick="requestGPS()">Reintentar</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Controls -->
+    <div class="capture-controls">
+      <button class="btn btn-secondary" id="btnResume" disabled title="Reanudar">
+        ▶ Reanudar
+      </button>
+      <button class="btn-record" id="btnRecord" title="Iniciar Captura">
+        <div class="rec-icon"></div>
+      </button>
+      <button class="btn btn-secondary" id="btnPause" disabled title="Pausar">
+        ⏸ Pausar
+      </button>
+    </div>
+
+    <!-- Actions -->
+    <div class="capture-actions">
+      <div class="flex items-center gap-sm">
+        <input type="text" class="track-name-input" id="trackNameInput" 
+               placeholder="Nombre del recorrido...">
+        <button class="btn btn-sm btn-secondary" id="btnHistory" title="Historial">
+          📋
+        </button>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-sm btn-success" id="btnDownloadGPX" disabled>
+          ⬇ GPX
+        </button>
+        <button class="btn btn-sm btn-secondary" id="btnDownloadJSON" disabled>
+          ⬇ JSON
+        </button>
+      </div>
+    </div>
+
+    <!-- Saved Tracks List -->
+    <div id="savedTracksList" class="saved-tracks"></div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script type="module" src="capture.js"></script>
+</body>
+</html>
