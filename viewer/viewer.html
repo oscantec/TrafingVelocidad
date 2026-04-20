@@ -353,11 +353,37 @@
             <div class="form-group">
               <label class="form-label">O Importar Archivo</label>
               <div class="file-input-wrapper">
-                <input type="file" accept=".gpx,.json" id="trackFileInput">
+                <input type="file" accept=".gpx,.json,.kml,.geojson,.xml" id="trackFileInput">
                 <div class="file-label">
-                  Arrastra un archivo <strong>.GPX</strong> o <strong>.JSON</strong>
+                  Arrastra <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSON</strong>
                 </div>
               </div>
+            </div>
+
+            <!-- From URL -->
+            <div class="form-group">
+              <label class="form-label">O Desde una URL</label>
+              <div class="track-selector">
+                <input type="url" id="trackUrlInput" class="form-input mono" style="flex:1;font-size:var(--fs-xs);"
+                       placeholder="https://…/track.gpx">
+                <button class="btn btn-sm btn-primary" id="btnLoadUrl" title="Descargar">↓</button>
+              </div>
+              <div class="text-xs text-muted" style="margin-top:6px;line-height:1.5;">
+                Funciona con URLs directas (GitHub raw, Dropbox, servidor propio). Sitios como
+                <strong>gpxscan.com</strong> bloquean acceso externo — descarga el archivo desde ahí y
+                súbelo arriba, o pégalo abajo.
+              </div>
+            </div>
+
+            <!-- Paste raw GPX/KML/GeoJSON -->
+            <div class="form-group">
+              <label class="form-label">O Pegar Contenido</label>
+              <textarea id="trackPasteInput" rows="4" class="form-input mono"
+                        style="font-size:11px;line-height:1.4;resize:vertical;"
+                        placeholder="Pega aquí el XML del GPX / KML o el GeoJSON…"></textarea>
+              <button class="btn btn-sm btn-secondary w-full" id="btnLoadPaste" style="margin-top:6px;">
+                Cargar contenido pegado
+              </button>
             </div>
 
             <div id="trackInfo" class="hidden">

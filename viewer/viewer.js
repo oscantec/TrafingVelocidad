@@ -9,7 +9,7 @@ import {
   matchNodesToTrack, segmentTrack, segmentMetrics,
   formatDistance, formatDuration, formatSpeed, generateSegmentColors,
 } from '../lib/geo.js';
-import { parseGPX, parseNodesFile, readFileAsText } from '../lib/gpx.js';
+import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -32,6 +32,10 @@ const el = {
   trackSelect: $('trackSelect'),
   btnRefreshTracks: $('btnRefreshTracks'),
   trackFileInput: $('trackFileInput'),
+  trackUrlInput: $('trackUrlInput'),
+  btnLoadUrl: $('btnLoadUrl'),
+  trackPasteInput: $('trackPasteInput'),
+  btnLoadPaste: $('btnLoadPaste'),
   nodesFileInput: $('nodesFileInput'),
   thresholdInput: $('thresholdInput'),
   btnProcess: $('btnProcess'),
@@ -95,6 +99,15 @@ function bindEvents() {
 
   // Track from file
   el.trackFileInput.addEventListener('change', handleTrackFileImport);
+
+  // Track from URL
+  el.btnLoadUrl.addEventListener('click', handleTrackUrlImport);
+  el.trackUrlInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleTrackUrlImport();
+  });
+
+  // Track from pasted content
+  el.btnLoadPaste.addEventListener('click', handleTrackPasteImport);
 
   // Nodes from file
   el.nodesFileInput.addEventListener('change', handleNodesFileImport);
@@ -190,25 +203,52 @@ async function handleTrackFileImport(event) {
 
   try {
     const text = await readFileAsText(file);
-    const ext = file.name.split('.').pop().toLowerCase();
-
-    let points;
-    if (ext === 'gpx') {
-      const result = parseGPX(text);
-      points = result.points;
-    } else if (ext === 'json') {
-      const data = JSON.parse(text);
-      points = data.points || data;
-    } else {
-      showToast('Formato no soportado. Usa .gpx o .json', 'warning');
-      return;
-    }
-
+    const { name, points } = parseTrackContent(text, file.name);
     loadTrackData(points);
-    showToast(`Archivo importado: ${points.length} puntos`, 'success');
+    showToast(`Archivo importado (${name}): ${points.length} puntos`, 'success');
   } catch (err) {
     console.error('[Viewer] Import error:', err);
     showToast(`Error importando: ${err.message}`, 'error');
+  }
+}
+
+async function handleTrackUrlImport() {
+  const url = (el.trackUrlInput.value || '').trim();
+  if (!url) { showToast('Ingresa una URL', 'warning'); return; }
+
+  try {
+    el.btnLoadUrl.disabled = true;
+    el.btnLoadUrl.textContent = '…';
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text = await resp.text();
+    const { name, points } = parseTrackContent(text, url);
+    loadTrackData(points);
+    showToast(`URL importada (${name}): ${points.length} puntos`, 'success');
+  } catch (err) {
+    console.error('[Viewer] URL import error:', err);
+    const msg = String(err.message || err);
+    if (msg.includes('Failed to fetch') || msg.includes('CORS') || msg.includes('NetworkError')) {
+      showToast('El servidor bloquea acceso cruzado (CORS). Descarga el archivo y súbelo o pégalo.', 'error', 6500);
+    } else {
+      showToast(`Error: ${msg}`, 'error', 6000);
+    }
+  } finally {
+    el.btnLoadUrl.disabled = false;
+    el.btnLoadUrl.textContent = '↓';
+  }
+}
+
+function handleTrackPasteImport() {
+  const text = (el.trackPasteInput.value || '').trim();
+  if (!text) { showToast('Pega el contenido antes de cargar', 'warning'); return; }
+
+  try {
+    const { name, points } = parseTrackContent(text);
+    loadTrackData(points);
+    showToast(`Contenido cargado (${name}): ${points.length} puntos`, 'success');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error', 6000);
   }
 }
 
