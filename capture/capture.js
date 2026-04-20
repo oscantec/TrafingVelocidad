@@ -5,10 +5,10 @@
  * State Machine: IDLE → RECORDING → PAUSED → STOPPED
  */
 
-import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, deleteTrack } from '../lib/db.js';
+import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, getUnsyncedTracks, deleteTrack } from '../lib/db.js';
 import { haversineDistance, totalDistance, formatDistance, formatDuration, formatSpeed } from '../lib/geo.js';
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
-import { syncTrackToCloud } from '../lib/supabase.js';
+import { syncTrackToCloud, testConnection } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -95,6 +95,46 @@ async function init() {
   initMap();
   bindEvents();
   checkGPSPermission();
+  probeCloudConnection();
+  autoSyncPending();
+}
+
+// ── Cloud Probe ──────────────────────────────────────────────
+async function probeCloudConnection() {
+  setStatus(el.statusSync, 'warning', 'Nube: Probando...');
+  const { ok, error } = await testConnection();
+  if (ok) {
+    setStatus(el.statusSync, 'active', 'Nube: Conectado');
+  } else {
+    setStatus(el.statusSync, 'error', 'Nube: Sin conexión');
+    console.warn('[cloud] probe failed:', error);
+  }
+}
+
+// ── Auto-sync any leftover tracks from prior sessions ───────
+async function autoSyncPending() {
+  try {
+    const pending = await getUnsyncedTracks();
+    if (pending.length === 0) return;
+
+    showToast(`Sincronizando ${pending.length} recorrido(s) pendiente(s)...`, 'info', 4000);
+
+    let ok = 0, fail = 0;
+    for (const t of pending) {
+      const points = await getTrackPoints(t.id);
+      const result = await syncTrackToCloud(t, points);
+      if (result.success) {
+        await updateTrack(t.id, { synced: true, cloudId: result.cloudId });
+        ok++;
+      } else {
+        fail++;
+      }
+    }
+    if (ok)   showToast(`${ok} recorrido(s) sincronizado(s) a la nube`, 'success');
+    if (fail) showToast(`${fail} recorrido(s) no se pudo(ieron) sincronizar`, 'warning');
+  } catch (err) {
+    console.warn('[cloud] autoSync error:', err);
+  }
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -421,15 +461,17 @@ async function syncCurrentTrack() {
     const result = await syncTrackToCloud(track, points);
 
     if (result.success) {
+      await updateTrack(currentTrackId, { synced: true, cloudId: result.cloudId });
       setStatus(el.statusSync, 'active', 'Nube: Sincronizado');
-      showToast('Recorrido sincronizado a la nube', 'success');
+      showToast(`Recorrido sincronizado (${points.length} puntos)`, 'success');
     } else {
       setStatus(el.statusSync, 'error', 'Nube: Error');
-      showToast('Error al sincronizar con la nube', 'error');
+      showToast(`Error al sincronizar: ${result.error}`, 'error', 6000);
     }
   } catch (err) {
     console.error('[Sync] Error:', err);
     setStatus(el.statusSync, 'error', 'Nube: Error');
+    showToast(`Error al sincronizar: ${err.message || err}`, 'error', 6000);
   }
 }
 
@@ -713,20 +755,28 @@ function renderTracksList(tracks) {
     return;
   }
 
-  el.savedTracksList.innerHTML = tracks.map((t) => `
+  el.savedTracksList.innerHTML = tracks.map((t) => {
+    const cloudTag = t.synced
+      ? '<span class="badge badge-success" style="text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">☁ nube</span>'
+      : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">solo local</span>';
+    const syncBtn = t.synced
+      ? ''
+      : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">☁↑</button>`;
+    return `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
-        <span class="track-title">${escapeHtml(t.name)}</span>
+        <span class="track-title">${escapeHtml(t.name)} ${cloudTag}</span>
         <span class="track-meta">
           ${new Date(t.startTime).toLocaleString('es')} · ${t.pointCount || 0} pts · ${t.status}
         </span>
       </div>
       <div class="btn-group">
+        ${syncBtn}
         <button class="btn btn-sm btn-secondary" onclick="loadTrack('${t.id}')" title="Ver en mapa">👁</button>
         <button class="btn btn-sm btn-danger" onclick="removeTrack('${t.id}')" title="Eliminar">✕</button>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function escapeHtml(s) {
@@ -750,6 +800,29 @@ window.loadTrack = async function(trackId) {
     showToast(`Track cargado: ${points.length} puntos`, 'success');
   } catch (err) {
     showToast('Error cargando track', 'error');
+  }
+};
+
+window.pushTrack = async function(trackId) {
+  try {
+    const tracks = await getAllTracks();
+    const t = tracks.find(x => x.id === trackId);
+    if (!t) return;
+    const points = await getTrackPoints(trackId);
+    setStatus(el.statusSync, 'warning', 'Nube: Subiendo...');
+    const result = await syncTrackToCloud(t, points);
+    if (result.success) {
+      await updateTrack(trackId, { synced: true, cloudId: result.cloudId });
+      setStatus(el.statusSync, 'active', 'Nube: Sincronizado');
+      showToast(`"${t.name}" subido a la nube`, 'success');
+      const updated = await getAllTracks();
+      renderTracksList(updated);
+    } else {
+      setStatus(el.statusSync, 'error', 'Nube: Error');
+      showToast(`Error: ${result.error}`, 'error', 6000);
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message || err}`, 'error', 6000);
   }
 };
 
