@@ -27,7 +27,7 @@
       flex-direction: column;
       overflow-y: auto;
       border-right: 1px solid var(--border);
-      background: var(--bg-secondary);
+      background: var(--surface);
     }
 
     .viewer-panel-section {
@@ -52,17 +52,20 @@
 
     .track-selector select {
       flex: 1;
-      padding: var(--sp-sm) var(--sp-md);
-      background: var(--surface);
+      padding: 10px var(--sp-md);
+      background: var(--surface-alt);
       border: 1px solid var(--border);
       border-radius: var(--r-md);
       color: var(--text-primary);
       font-size: var(--fs-xs);
       font-family: var(--font-mono);
+      transition: all var(--t-fast);
     }
 
     .track-selector select:focus {
       border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     /* Nodes List */
@@ -83,7 +86,7 @@
     }
 
     .node-item:hover {
-      background: var(--surface-hover);
+      background: var(--surface-alt);
     }
 
     .node-item .node-name {
@@ -124,10 +127,11 @@
       margin-top: var(--sp-md);
       border-radius: var(--r-md);
       overflow: hidden;
+      border: 1px solid var(--border);
     }
 
     .summary-metric {
-      background: var(--surface);
+      background: var(--surface-alt);
       padding: var(--sp-md);
       text-align: center;
     }
@@ -170,18 +174,21 @@
 
     .threshold-row input[type="number"] {
       width: 80px;
-      padding: var(--sp-xs) var(--sp-sm);
-      background: var(--surface);
+      padding: 8px var(--sp-sm);
+      background: var(--surface-alt);
       border: 1px solid var(--border);
-      border-radius: var(--r-sm);
+      border-radius: var(--r-md);
       color: var(--text-primary);
       font-family: var(--font-mono);
       font-size: var(--fs-xs);
       text-align: center;
+      transition: all var(--t-fast);
     }
 
     .threshold-row input[type="number"]:focus {
       border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     .threshold-row label {
@@ -264,10 +271,12 @@
     <header class="app-header">
       <div class="logo">
         <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
-          <div class="logo-mark">N</div>
+          <div class="logo-mark">
+            <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
+          </div>
           <div class="logo-text">
-            Visor
-            <span>Segmentación</span>
+            Procesamiento
+            <span>Segmentación de tramos</span>
           </div>
         </a>
       </div>

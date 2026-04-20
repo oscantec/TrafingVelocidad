@@ -48,7 +48,7 @@
     }
 
     .capture-metric {
-      background: var(--bg-secondary);
+      background: var(--surface);
       padding: var(--sp-md) var(--sp-lg);
       text-align: center;
     }
@@ -107,13 +107,13 @@
       justify-content: center;
       gap: var(--sp-md);
       padding: var(--sp-lg) var(--sp-xl);
-      background: var(--bg-secondary);
+      background: var(--surface);
       border-top: 1px solid var(--border);
     }
 
     .btn-record {
-      width: 64px;
-      height: 64px;
+      width: 70px;
+      height: 70px;
       border-radius: 50%;
       background: var(--accent);
       color: #fff;
@@ -124,6 +124,7 @@
       transition: all var(--t-fast);
       border: 3px solid transparent;
       position: relative;
+      box-shadow: var(--shadow-md);
     }
 
     .btn-record::after {
@@ -132,7 +133,7 @@
 
     .btn-record:hover {
       transform: scale(1.05);
-      box-shadow: var(--shadow-glow);
+      box-shadow: var(--shadow-lg), 0 0 0 6px var(--accent-glow);
     }
 
     .btn-record:active {
@@ -169,18 +170,23 @@
     }
 
     .track-name-input {
-      background: var(--surface);
+      background: var(--surface-alt);
       border: 1px solid var(--border);
-      border-radius: var(--r-sm);
-      padding: var(--sp-xs) var(--sp-md);
+      border-radius: var(--r-md);
+      padding: 8px var(--sp-md);
       font-size: var(--fs-xs);
       font-family: var(--font-mono);
       color: var(--text-primary);
       width: 200px;
+      transition: border-color var(--t-fast), background var(--t-fast);
     }
+
+    .track-name-input::placeholder { color: var(--text-muted); }
 
     .track-name-input:focus {
       border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     /* GPS Error overlay */
@@ -267,7 +273,9 @@
     <header class="app-header">
       <div class="logo">
         <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
-          <div class="logo-mark">N</div>
+          <div class="logo-mark">
+            <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
+          </div>
           <div class="logo-text">
             Captura
             <span>GPS Tracking</span>
