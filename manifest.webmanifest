@@ -1,0 +1,16 @@
+{
+  "name": "Softrafing Velocidades",
+  "short_name": "Velocidades",
+  "description": "Captura y procesamiento GPS para ingeniería de tráfico — NextCan",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#F05A1A",
+  "background_color": "#F3F5F8",
+  "lang": "es",
+  "icons": [
+    { "src": "Images/Softrafingvel.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "Images/Softrafingvel.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

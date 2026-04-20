@@ -13,6 +13,31 @@
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
+  <meta name="theme-color" content="#FFFFFF">
+  <style>
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-secondary);
+      font-size: var(--fs-xs);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--t-fast);
+      text-decoration: none;
+    }
+    .back-btn:hover {
+      background: var(--surface);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+  </style>
   <style>
     /* ── Viewer-specific styles ─────────────────────────────── */
     .viewer-layout {
@@ -269,8 +294,14 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="logo">
-        <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
+      <div class="flex items-center gap-md">
+        <a href="../index.html" class="back-btn" title="Volver al menú principal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>Inicio</span>
+        </a>
+        <div class="logo">
           <div class="logo-mark">
             <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
           </div>
@@ -278,7 +309,7 @@
             Procesamiento
             <span>Segmentación de tramos</span>
           </div>
-        </a>
+        </div>
       </div>
       <div class="flex items-center gap-md">
         <div id="processBadge" class="badge hidden">

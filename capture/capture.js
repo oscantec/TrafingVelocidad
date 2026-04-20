@@ -1,7 +1,7 @@
 /**
- * TrafingVelocidad — Capture Module
+ * Softrafing Velocidades — Capture Module
  * High-precision GPS tracking with IndexedDB persistence, Wake Lock, and GPX export
- * 
+ *
  * State Machine: IDLE → RECORDING → PAUSED → STOPPED
  */
 
@@ -20,25 +20,30 @@ const STATE = {
 
 let currentState = STATE.IDLE;
 let currentTrackId = null;
+let currentTrackName = '';
 let watchId = null;
 let wakeLock = null;
 let timerInterval = null;
 let startTimestamp = null;
 let pausedDuration = 0;
 let pauseStart = null;
+let hiddenSince = null;
 
 // Live data
 let pointCount = 0;
 let totalDist = 0;
 let lastPoint = null;
 let currentSpeed = 0;
-let allPoints = []; // In-memory buffer for map rendering
+let allPoints = [];
 
 // Leaflet
 let map = null;
 let positionMarker = null;
 let accuracyCircle = null;
 let trackPolyline = null;
+
+// Theme accent
+const ACCENT = '#F05A1A';
 
 // ── DOM Elements ─────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -50,9 +55,11 @@ const el = {
   btnDownloadGPX: $('btnDownloadGPX'),
   btnDownloadJSON: $('btnDownloadJSON'),
   btnHistory: $('btnHistory'),
-  trackNameInput: $('trackNameInput'),
+  btnBackHome: $('btnBackHome'),
+  currentTrackName: $('currentTrackName'),
   recordingBadge: $('recordingBadge'),
   wakeLockBadge: $('wakeLockBadge'),
+  bgWarningBanner: $('bgWarningBanner'),
   statusGPS: $('statusGPS'),
   statusAccuracy: $('statusAccuracy'),
   statusPoints: $('statusPoints'),
@@ -66,6 +73,13 @@ const el = {
   gpsErrorMessage: $('gpsErrorMessage'),
   savedTracksList: $('savedTracksList'),
   toastContainer: $('toastContainer'),
+  startModal: $('startModal'),
+  modalTrackName: $('modalTrackName'),
+  modalStart: $('modalStart'),
+  modalCancel: $('modalCancel'),
+  stopModal: $('stopModal'),
+  stopConfirm: $('stopConfirm'),
+  stopCancel: $('stopCancel'),
 };
 
 // ── Initialize ───────────────────────────────────────────────
@@ -86,62 +100,77 @@ async function init() {
 // ── Map Setup ────────────────────────────────────────────────
 function initMap() {
   map = L.map('captureMap', {
-    center: [4.6097, -74.0817], // Bogota default
+    center: [4.6097, -74.0817],
     zoom: 15,
     zoomControl: true,
     attributionControl: true,
   });
 
-  // Dark tile layer
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // Light tile layer (matches theme)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
     subdomains: 'abcd',
     maxZoom: 20,
   }).addTo(map);
 
-  // Track polyline
   trackPolyline = L.polyline([], {
-    color: '#FF6B00',
+    color: ACCENT,
     weight: 4,
     opacity: 0.9,
     smoothFactor: 1,
   }).addTo(map);
 
-  // Position marker (orange pulsing dot)
   const pulseIcon = L.divIcon({
     className: '',
     html: `<div style="
-      width: 16px; height: 16px;
-      background: #FF6B00;
+      width: 18px; height: 18px;
+      background: ${ACCENT};
       border: 3px solid #fff;
       border-radius: 50%;
-      box-shadow: 0 0 12px rgba(255,107,0,0.6);
+      box-shadow: 0 0 0 4px rgba(240,90,26,0.2), 0 2px 8px rgba(15,23,42,0.25);
     "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
   });
 
   positionMarker = L.marker([0, 0], { icon: pulseIcon }).addTo(map);
   positionMarker.setOpacity(0);
 
-  // Accuracy circle
   accuracyCircle = L.circle([0, 0], {
     radius: 0,
-    color: '#FF6B00',
-    fillColor: '#FF6B00',
+    color: ACCENT,
+    fillColor: ACCENT,
     fillOpacity: 0.08,
     weight: 1,
     opacity: 0.3,
   }).addTo(map);
   accuracyCircle.setStyle({ opacity: 0, fillOpacity: 0 });
 
-  // Fix map size after layout
   setTimeout(() => map.invalidateSize(), 100);
 }
 
-// ── GPS Permission Check ─────────────────────────────────────
+// ── GPS Permission / Environment Check ───────────────────────
 async function checkGPSPermission() {
+  // Protocol / secure context diagnostics
+  if (location.protocol === 'file:') {
+    setStatus(el.statusGPS, 'error', 'GPS: No disponible (file://)');
+    showGPSError(
+      'Esta app está abierta como archivo local (file://). Los navegadores bloquean el GPS en este modo. ' +
+      'Sirve la app por HTTPS o ejecuta un servidor local (p. ej. "python3 -m http.server 8000" y abre http://localhost:8000).'
+    );
+    return;
+  }
+
+  if (!window.isSecureContext) {
+    setStatus(el.statusGPS, 'error', 'GPS: Contexto no seguro');
+    showGPSError(
+      'El GPS requiere HTTPS o localhost. Carga la app a través de un dominio con certificado SSL.'
+    );
+    return;
+  }
+
   if (!('geolocation' in navigator)) {
+    setStatus(el.statusGPS, 'error', 'GPS: No soportado');
     showGPSError('Tu navegador no soporta geolocalización.');
     return;
   }
@@ -154,20 +183,28 @@ async function checkGPSPermission() {
         getInitialPosition();
       } else if (result.state === 'prompt') {
         setStatus(el.statusGPS, 'warning', 'GPS: Pendiente permiso');
+        // Trigger prompt by requesting a position immediately
+        getInitialPosition();
       } else {
         setStatus(el.statusGPS, 'error', 'GPS: Denegado');
-        showGPSError('El permiso de ubicación fue denegado. Habilítalo en la configuración del navegador.');
+        showGPSError(
+          'El permiso de ubicación fue denegado. En macOS: revisa Ajustes del Sistema → Privacidad y Seguridad → Servicios de localización, y habilítalo también para tu navegador.'
+        );
       }
 
       result.addEventListener('change', () => {
         if (result.state === 'granted') {
           hideGPSError();
           setStatus(el.statusGPS, 'active', 'GPS: Listo');
+          getInitialPosition();
+        } else if (result.state === 'denied') {
+          setStatus(el.statusGPS, 'error', 'GPS: Denegado');
         }
       });
+    } else {
+      getInitialPosition();
     }
   } catch {
-    // Permissions API not supported, try getting position
     getInitialPosition();
   }
 }
@@ -183,7 +220,7 @@ function getInitialPosition() {
       hideGPSError();
     },
     (err) => handleGPSError(err),
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
   );
 }
 
@@ -196,12 +233,49 @@ function bindEvents() {
   el.btnDownloadJSON.addEventListener('click', handleDownloadJSON);
   el.btnHistory.addEventListener('click', toggleHistory);
 
-  // Re-acquire wake lock on visibility change
-  document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible' && currentState === STATE.RECORDING) {
-      await acquireWakeLock();
+  // Back to home with confirmation when recording
+  el.btnBackHome.addEventListener('click', (e) => {
+    if (currentState === STATE.RECORDING || currentState === STATE.PAUSED) {
+      e.preventDefault();
+      const ok = confirm('Hay una captura en curso. ¿Detener y volver al menú principal?');
+      if (!ok) return;
+      stopRecording().finally(() => { location.href = '../index.html'; });
     }
   });
+
+  // Modal: Start
+  el.modalStart.addEventListener('click', async () => {
+    const name = el.modalTrackName.value.trim();
+    if (!name) {
+      el.modalTrackName.focus();
+      el.modalTrackName.style.borderColor = 'var(--danger)';
+      setTimeout(() => { el.modalTrackName.style.borderColor = ''; }, 1500);
+      return;
+    }
+    closeStartModal();
+    await startRecording(name);
+  });
+  el.modalCancel.addEventListener('click', closeStartModal);
+  el.startModal.addEventListener('click', (e) => {
+    if (e.target === el.startModal) closeStartModal();
+  });
+  el.modalTrackName.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') el.modalStart.click();
+    if (e.key === 'Escape') closeStartModal();
+  });
+
+  // Modal: Stop confirm
+  el.stopConfirm.addEventListener('click', async () => {
+    closeStopModal();
+    await stopRecording();
+  });
+  el.stopCancel.addEventListener('click', closeStopModal);
+  el.stopModal.addEventListener('click', (e) => {
+    if (e.target === el.stopModal) closeStopModal();
+  });
+
+  // Visibility / background handling
+  document.addEventListener('visibilitychange', handleVisibilityChange);
 
   // Warn before closing during recording
   window.addEventListener('beforeunload', (e) => {
@@ -212,26 +286,72 @@ function bindEvents() {
   });
 }
 
-// ── Recording Controls ───────────────────────────────────────
-async function handleRecord() {
-  if (currentState === STATE.IDLE || currentState === STATE.STOPPED) {
-    await startRecording();
-  } else if (currentState === STATE.RECORDING) {
-    await stopRecording();
+// ── Visibility / Background ──────────────────────────────────
+async function handleVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    if (currentState === STATE.RECORDING) {
+      hiddenSince = Date.now();
+    }
+  } else if (document.visibilityState === 'visible') {
+    if (currentState === STATE.RECORDING) {
+      // Re-acquire wake lock (released automatically on hide)
+      await acquireWakeLock();
+      el.bgWarningBanner.classList.remove('active');
+
+      if (hiddenSince) {
+        const gapMs = Date.now() - hiddenSince;
+        hiddenSince = null;
+        if (gapMs > 8000) {
+          const sec = Math.round(gapMs / 1000);
+          showToast(
+            `La app estuvo en segundo plano ${sec}s — puede que falten puntos en ese intervalo.`,
+            'warning', 6000
+          );
+        }
+      }
+    }
   }
 }
 
-async function startRecording() {
+// ── Recording Controls ───────────────────────────────────────
+function handleRecord() {
+  if (currentState === STATE.IDLE || currentState === STATE.STOPPED) {
+    openStartModal();
+  } else if (currentState === STATE.RECORDING) {
+    openStopModal();
+  }
+}
+
+function openStartModal() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const defaultName = `Recorrido ${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  el.modalTrackName.value = defaultName;
+  el.startModal.classList.add('active');
+  setTimeout(() => { el.modalTrackName.focus(); el.modalTrackName.select(); }, 80);
+}
+
+function closeStartModal() {
+  el.startModal.classList.remove('active');
+}
+
+function openStopModal() {
+  el.stopModal.classList.add('active');
+}
+
+function closeStopModal() {
+  el.stopModal.classList.remove('active');
+}
+
+async function startRecording(name) {
   try {
-    // Create track
-    const name = el.trackNameInput.value.trim() || `Recorrido ${new Date().toLocaleDateString('es')}`;
+    currentTrackName = name;
     currentTrackId = await createTrack({
       name,
       startTime: Date.now(),
       status: 'recording',
     });
 
-    // Reset state
     pointCount = 0;
     totalDist = 0;
     lastPoint = null;
@@ -240,21 +360,24 @@ async function startRecording() {
     pausedDuration = 0;
     startTimestamp = Date.now();
 
-    // Clear map
     trackPolyline.setLatLngs([]);
 
-    // Start GPS watch
-    startWatching();
+    // Reset metrics display
+    el.metricSpeed.textContent = '0.0';
+    el.metricDistance.textContent = '0.00';
+    el.metricTime.textContent = '00:00:00';
+    el.metricAvgSpeed.textContent = '0.0';
+    el.currentTrackName.textContent = name;
+    el.currentTrackName.title = name;
 
-    // Wake Lock
+    startWatching();
     await acquireWakeLock();
 
-    // Timer
     timerInterval = setInterval(updateTimer, 1000);
 
-    // Update UI state
     setState(STATE.RECORDING);
-    showToast('Captura iniciada', 'success');
+    el.bgWarningBanner.classList.add('active');
+    showToast(`Captura iniciada: ${name}`, 'success');
   } catch (err) {
     console.error('[Capture] Start error:', err);
     showToast('Error al iniciar captura', 'error');
@@ -262,17 +385,12 @@ async function startRecording() {
 }
 
 async function stopRecording() {
-  // Stop GPS
   stopWatching();
-
-  // Release Wake Lock
   releaseWakeLock();
 
-  // Stop timer
   clearInterval(timerInterval);
   timerInterval = null;
 
-  // Update track in DB
   if (currentTrackId) {
     await updateTrack(currentTrackId, {
       endTime: Date.now(),
@@ -282,9 +400,9 @@ async function stopRecording() {
   }
 
   setState(STATE.STOPPED);
+  el.bgWarningBanner.classList.remove('active');
   showToast(`Captura finalizada · ${pointCount} puntos`, 'success');
 
-  // Auto-sync to Supabase
   syncCurrentTrack();
 }
 
@@ -292,7 +410,7 @@ async function syncCurrentTrack() {
   if (pointCount === 0 || !currentTrackId) return;
 
   setStatus(el.statusSync, 'warning', 'Nube: Sincronizando...');
-  
+
   try {
     const points = await getTrackPoints(currentTrackId);
     const tracks = await getAllTracks();
@@ -301,7 +419,7 @@ async function syncCurrentTrack() {
     if (!track) return;
 
     const result = await syncTrackToCloud(track, points);
-    
+
     if (result.success) {
       setStatus(el.statusSync, 'active', 'Nube: Sincronizado');
       showToast('Recorrido sincronizado a la nube', 'success');
@@ -332,7 +450,6 @@ function handlePause() {
 async function handleResume() {
   if (currentState !== STATE.PAUSED) return;
 
-  // Track paused duration
   if (pauseStart) {
     pausedDuration += Date.now() - pauseStart;
     pauseStart = null;
@@ -357,7 +474,7 @@ function startWatching() {
     {
       enableHighAccuracy: true,
       maximumAge: 0,
-      timeout: 15000,
+      timeout: 20000,
     }
   );
 }
@@ -373,22 +490,22 @@ async function handlePosition(position) {
   const { latitude, longitude, accuracy, altitude, speed } = position.coords;
   const timestamp = position.timestamp || Date.now();
 
-  // Update GPS status
   setStatus(el.statusGPS, 'active', 'GPS: Activo');
   setStatus(el.statusAccuracy, accuracy <= 20 ? 'active' : 'warning', `Precisión: ±${Math.round(accuracy)}m`);
 
-  // Update position marker
   positionMarker.setLatLng([latitude, longitude]);
   positionMarker.setOpacity(1);
   accuracyCircle.setLatLng([latitude, longitude]);
   accuracyCircle.setRadius(accuracy);
   accuracyCircle.setStyle({ opacity: 0.3, fillOpacity: 0.08 });
 
-  // Filter: discard points with very poor accuracy
   if (accuracy > 100) {
     setStatus(el.statusAccuracy, 'warning', `Precisión: ±${Math.round(accuracy)}m (baja)`);
     return;
   }
+
+  // Only persist while actually recording
+  if (currentState !== STATE.RECORDING) return;
 
   const point = {
     trackId: currentTrackId,
@@ -400,28 +517,23 @@ async function handlePosition(position) {
     timestamp,
   };
 
-  // Calculate distance from last point
   if (lastPoint) {
     const dist = haversineDistance(lastPoint, point);
-    // Filter: skip if too close (noise) or impossibly far (GPS jump)
-    if (dist < 1 || dist > 500) {
-      return;
-    }
+    if (dist < 1 || dist > 500) return;
     totalDist += dist;
   }
 
-  // Save to IndexedDB immediately
   try {
     await addPoint(point);
     pointCount++;
     lastPoint = point;
     allPoints.push(point);
 
-    // Update map
     trackPolyline.addLatLng([latitude, longitude]);
-    map.panTo([latitude, longitude], { animate: true, duration: 0.5 });
+    if (document.visibilityState === 'visible') {
+      map.panTo([latitude, longitude], { animate: true, duration: 0.5 });
+    }
 
-    // Update metrics
     updateMetrics(point);
     setStatus(el.statusPoints, 'active', `Puntos: ${pointCount}`);
   } catch (err) {
@@ -434,15 +546,15 @@ function handleGPSError(error) {
   switch (error.code) {
     case error.PERMISSION_DENIED:
       setStatus(el.statusGPS, 'error', 'GPS: Denegado');
-      showGPSError('Permiso de ubicación denegado. Habilítalo en la configuración del navegador.');
+      showGPSError(
+        'Permiso de ubicación denegado. En macOS: Ajustes del Sistema → Privacidad y Seguridad → Servicios de localización → activa el servicio y el permiso para tu navegador. Luego recarga la página.'
+      );
       break;
     case error.POSITION_UNAVAILABLE:
       setStatus(el.statusGPS, 'warning', 'GPS: Sin señal');
-      // Don't stop — keep trying
       break;
     case error.TIMEOUT:
       setStatus(el.statusGPS, 'warning', 'GPS: Timeout');
-      // Auto-retry is handled by watchPosition
       break;
     default:
       setStatus(el.statusGPS, 'error', `GPS: Error ${error.code}`);
@@ -480,14 +592,11 @@ function releaseWakeLock() {
 
 // ── Metrics Update ───────────────────────────────────────────
 function updateMetrics(point) {
-  // Current speed (m/s → km/h)
   currentSpeed = (point.speed ?? 0) * 3.6;
   el.metricSpeed.textContent = formatSpeed(currentSpeed);
 
-  // Distance
   el.metricDistance.textContent = (totalDist / 1000).toFixed(2);
 
-  // Average speed
   const elapsed = getElapsedSeconds();
   if (elapsed > 0) {
     const avgKmh = (totalDist / 1000) / (elapsed / 3600);
@@ -514,20 +623,16 @@ function setState(state) {
   const isPaused = state === STATE.PAUSED;
   const isStopped = state === STATE.STOPPED;
 
-  // Record button
   el.btnRecord.classList.toggle('recording', isRecording);
   el.btnRecord.title = isRecording ? 'Detener Captura' : 'Iniciar Captura';
   el.btnRecord.disabled = isPaused;
 
-  // Pause / Resume
   el.btnPause.disabled = !isRecording;
   el.btnResume.disabled = !isPaused;
 
-  // Download buttons
   el.btnDownloadGPX.disabled = !(isStopped && pointCount > 0);
   el.btnDownloadJSON.disabled = !(isStopped && pointCount > 0);
 
-  // Recording badge
   if (isRecording) {
     el.recordingBadge.classList.remove('hidden');
     el.recordingBadge.classList.add('active');
@@ -536,9 +641,6 @@ function setState(state) {
   } else {
     el.recordingBadge.classList.add('hidden');
   }
-
-  // Track name input
-  el.trackNameInput.disabled = isRecording || isPaused;
 }
 
 // ── Downloads ────────────────────────────────────────────────
@@ -552,8 +654,7 @@ async function handleDownloadGPX() {
       return;
     }
 
-    const name = el.trackNameInput.value.trim() || 'Track';
-    const gpxString = generateGPX(name, points);
+    const gpxString = generateGPX(currentTrackName || 'Track', points);
     downloadGPX(gpxString);
     showToast('GPX descargado', 'success');
   } catch (err) {
@@ -570,7 +671,7 @@ async function handleDownloadJSON() {
     const data = {
       track: {
         id: currentTrackId,
-        name: el.trackNameInput.value.trim() || 'Track',
+        name: currentTrackName || 'Track',
         startTime: startTimestamp,
         endTime: Date.now(),
         totalDistance: totalDist,
@@ -615,7 +716,7 @@ function renderTracksList(tracks) {
   el.savedTracksList.innerHTML = tracks.map((t) => `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
-        <span class="track-title">${t.name}</span>
+        <span class="track-title">${escapeHtml(t.name)}</span>
         <span class="track-meta">
           ${new Date(t.startTime).toLocaleString('es')} · ${t.pointCount || 0} pts · ${t.status}
         </span>
@@ -626,6 +727,12 @@ function renderTracksList(tracks) {
       </div>
     </div>
   `).join('');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
 
 // Global functions for inline handlers
@@ -679,16 +786,25 @@ function hideGPSError() {
   el.gpsErrorOverlay.classList.add('hidden');
 }
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', durationMs = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   el.toastContainer.appendChild(toast);
 
   setTimeout(() => {
-    toast.style.animation = 'fade-in 0.3s var(--ease-out) reverse';
+    toast.style.transition = 'opacity 0.3s, transform 0.3s';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(60px)';
     setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  }, durationMs);
+}
+
+// ── Service Worker Registration ──────────────────────────────
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('../sw.js').catch((err) => {
+    console.warn('[SW] Registration failed:', err);
+  });
 }
 
 // ── Boot ─────────────────────────────────────────────────────

@@ -7,6 +7,7 @@
   <title>Softrafing Velocidades — NextCan Tráfico</title>
   <meta name="description" content="Sistema de tracking GPS y procesamiento de recorridos para ingeniería de tráfico — NextCan">
   <link rel="icon" href="Images/Softrafingvel.png" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -407,5 +408,14 @@
     NextCan Tráfico · Softrafing Velocidades v1.0.0
   </footer>
 
+  <script>
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => {
+          console.warn('[SW] Registration failed:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

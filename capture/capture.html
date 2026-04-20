@@ -16,6 +16,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="manifest" href="../manifest.webmanifest">
+  <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
+  <meta name="theme-color" content="#FFFFFF">
   <style>
     /* ── Capture-specific styles ────────────────────────────── */
     .capture-layout {
@@ -260,10 +263,52 @@
       font-size: 10px;
     }
 
+    /* Back button */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-secondary);
+      font-size: var(--fs-xs);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--t-fast);
+      text-decoration: none;
+    }
+
+    .back-btn:hover {
+      background: var(--surface);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .back-btn svg { flex-shrink: 0; }
+
+    /* Background warning badge */
+    .bg-warning-banner {
+      display: none;
+      align-items: center;
+      gap: var(--sp-sm);
+      padding: var(--sp-sm) var(--sp-xl);
+      background: var(--warning-dim);
+      border-bottom: 1px solid rgba(217, 119, 6, 0.2);
+      color: var(--warning);
+      font-size: var(--fs-xs);
+      font-weight: 600;
+    }
+
+    .bg-warning-banner.active { display: flex; }
+
     @media (max-width: 600px) {
       .capture-metrics {
         grid-template-columns: repeat(2, 1fr);
       }
+      .app-header .logo-text { display: none; }
+      .back-btn { padding: 6px 10px; font-size: 11px; }
     }
   </style>
 </head>
@@ -271,8 +316,14 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="logo">
-        <a href="../index.html" style="display:flex;align-items:center;gap:var(--sp-md);color:inherit;">
+      <div class="flex items-center gap-md">
+        <a href="../index.html" class="back-btn" id="btnBackHome" title="Volver al menú principal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>Inicio</span>
+        </a>
+        <div class="logo">
           <div class="logo-mark">
             <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
           </div>
@@ -280,7 +331,7 @@
             Captura
             <span>GPS Tracking</span>
           </div>
-        </a>
+        </div>
       </div>
       <div class="flex items-center gap-md">
         <div id="recordingBadge" class="recording-indicator hidden">
@@ -293,6 +344,16 @@
         </div>
       </div>
     </header>
+
+    <!-- Background capture warning -->
+    <div class="bg-warning-banner" id="bgWarningBanner">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <span>Mantén la pantalla encendida y esta pestaña visible — el navegador puede suspender la captura GPS en segundo plano.</span>
+    </div>
 
     <!-- Status Indicators -->
     <div class="capture-status">
@@ -372,8 +433,7 @@
     <!-- Actions -->
     <div class="capture-actions">
       <div class="flex items-center gap-sm">
-        <input type="text" class="track-name-input" id="trackNameInput" 
-               placeholder="Nombre del recorrido...">
+        <span id="currentTrackName" class="text-sm text-secondary mono" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
         <button class="btn btn-sm btn-secondary" id="btnHistory" title="Historial">
           📋
         </button>
@@ -393,6 +453,42 @@
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Start Capture Modal -->
+    <div class="modal-overlay" id="startModal">
+      <div class="modal">
+        <div class="modal-title">Iniciar nuevo recorrido</div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="modalTrackName">Nombre del recorrido</label>
+            <input type="text" class="form-input" id="modalTrackName"
+                   placeholder="Ej: Carrera 7 — tramo norte" autocomplete="off">
+          </div>
+          <div style="background: var(--warning-dim); padding: 10px 12px; border-radius: var(--r-md); color: var(--text-secondary); font-size: var(--fs-xs); line-height: 1.55;">
+            <strong style="color: var(--warning); display:block; margin-bottom:4px;">⚠ Captura continua</strong>
+            La grabación seguirá hasta que pulses <strong>STOP</strong>. Mantén la pantalla encendida; al minimizar o cambiar de app el navegador puede suspender el GPS.
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="modalCancel">Cancelar</button>
+          <button class="btn btn-primary" id="modalStart">Iniciar captura</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stop Confirm Modal -->
+    <div class="modal-overlay" id="stopModal">
+      <div class="modal">
+        <div class="modal-title">Detener captura</div>
+        <div class="modal-body">
+          ¿Deseas finalizar este recorrido? Los datos quedarán guardados en la base local y se sincronizarán a la nube.
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="stopCancel">Continuar grabando</button>
+          <button class="btn btn-primary" id="stopConfirm" style="background:var(--danger);">Detener</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="capture.js"></script>
