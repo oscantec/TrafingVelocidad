@@ -41,148 +41,203 @@
       color: var(--accent);
     }
 
-    /* ── Playback Panel ─────────────────────────────────── */
+    /* ── No-scroll shell ────────────────────────────────── */
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .app-container { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+    .viewer-layout {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      grid-template-rows: 1fr;
+      overflow: hidden;
+    }
+
+    .viewer-panel {
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .viewer-right {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .viewer-map {
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* ── Compact Playback Panel (Softrafing) ─────────────── */
     .playback-panel {
+      flex-shrink: 0;
       background: var(--surface);
       border-top: 1px solid var(--border);
-      padding: var(--sp-lg) var(--sp-xl);
+      padding: 10px 14px 12px;
       display: none;
       flex-direction: column;
-      gap: var(--sp-lg);
+      gap: 10px;
     }
     .playback-panel.active { display: flex; }
 
-    .gauges-strip {
+    /* Stat cards row */
+    .pb-stats {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: var(--sp-md);
+      gap: 8px;
     }
 
-    .gauge {
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: 10px 10px 14px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-    }
-
-    .gauge-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-
-    .gauge svg {
-      width: 100%;
-      max-width: 160px;
-      height: auto;
-      display: block;
-    }
-
-    .gauge-value {
-      font-family: var(--font-mono);
-      font-size: var(--fs-lg);
-      font-weight: 700;
-      color: var(--text-primary);
-      line-height: 1.1;
-      margin-top: -8px;
-    }
-
-    .gauge-unit {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-family: var(--font-sans);
-      font-weight: 500;
-    }
-
-    .gauge-range {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      max-width: 160px;
-      font-size: 9px;
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      margin-top: 2px;
-    }
-
-    .gauge .arc-bg  { stroke: var(--border); stroke-width: 10; fill: none; stroke-linecap: round; }
-    .gauge .arc-fg  { stroke-width: 10; fill: none; stroke-linecap: round;
-                      transition: stroke-dashoffset 0.35s var(--ease-out), stroke 0.3s; }
-
-    /* Chart */
-    .chart-wrap {
-      position: relative;
-      height: 240px;
-      width: 100%;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: var(--sp-md);
-    }
-
-    /* Playback controls */
-    .playback-controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--sp-md);
-      flex-wrap: wrap;
-    }
-
-    .playback-speed-select {
-      padding: 8px 12px;
+    .pb-stat {
       background: var(--surface-alt);
       border: 1px solid var(--border);
       border-radius: var(--r-md);
+      padding: 8px 10px 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .pb-stat-label {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .pb-stat-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .pb-stat-value {
+      font-family: var(--font-mono);
+      font-size: 17px;
+      font-weight: 700;
       color: var(--text-primary);
-      font-size: var(--fs-xs);
+      line-height: 1.05;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    .pb-stat-unit {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .pb-stat-max {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .pb-stat-bar {
+      height: 3px;
+      background: var(--border-soft, #EEF1F5);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .pb-stat-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width 0.3s var(--ease-out);
+    }
+    .pb-stat[data-metric="time"]      .pb-stat-bar-fill { background: #64748B; }
+    .pb-stat[data-metric="distance"]  .pb-stat-bar-fill { background: #475569; }
+    .pb-stat[data-metric="speed"]     .pb-stat-bar-fill { background: var(--accent); }
+    .pb-stat[data-metric="elevation"] .pb-stat-bar-fill { background: #22C55E; }
+    .pb-stat[data-metric="grade"]     .pb-stat-bar-fill { background: #EAB308; }
+
+    /* Chart */
+    .pb-chart {
+      position: relative;
+      height: 110px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      padding: 6px 10px;
+    }
+
+    /* Controls row */
+    .pb-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pb-point-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .pb-point-info strong { color: var(--text-primary); font-family: var(--font-mono); }
+
+    .pb-transport { display: flex; align-items: center; gap: 6px; }
+
+    .pb-speed {
+      padding: 5px 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      color: var(--text-primary);
+      font-size: 11px;
       font-weight: 600;
-      font-family: var(--font-sans);
+      cursor: pointer;
     }
 
     .pb-btn {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 10px 20px;
-      border-radius: var(--r-md);
-      font-weight: 700;
-      font-size: var(--fs-sm);
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: var(--r-sm);
+      font-weight: 600;
+      font-size: 11px;
       border: 1px solid transparent;
       transition: all var(--t-fast);
+      background: var(--surface);
+      color: var(--text-secondary);
+      border-color: var(--border);
     }
+    .pb-btn:hover:not(:disabled) { background: var(--surface-alt); color: var(--text-primary); }
     .pb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .pb-btn-play   { background: var(--success);  color: #fff; }
-    .pb-btn-play:hover:not(:disabled)   { filter: brightness(1.08); }
-    .pb-btn-pause  { background: var(--warning);  color: #fff; }
-    .pb-btn-pause:hover:not(:disabled)  { filter: brightness(1.08); }
-    .pb-btn-stop   { background: var(--danger);   color: #fff; }
-    .pb-btn-stop:hover:not(:disabled)   { filter: brightness(1.08); }
+    .pb-btn-play.active   { background: var(--success);    color: #fff; border-color: transparent; }
+    .pb-btn-pause.active  { background: #F59E0B;           color: #fff; border-color: transparent; }
+    .pb-btn-stop:hover:not(:disabled)  { background: var(--danger-dim); color: var(--danger); border-color: rgba(220,38,38,0.3); }
 
-    .playback-info {
-      text-align: center;
-      font-size: var(--fs-xs);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-    }
-    .playback-info strong { color: var(--text-primary); font-family: var(--font-mono); }
-
+    /* Media */
     @media (max-width: 900px) {
-      .playback-panel { padding: var(--sp-md); gap: var(--sp-md); }
-      .gauges-strip { grid-template-columns: repeat(3, 1fr); }
-      .gauge { padding: 8px 6px 10px; }
-      .gauge-value { font-size: var(--fs-md); }
-      .chart-wrap { height: 200px; padding: var(--sp-sm); }
+      .viewer-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+      .viewer-panel { max-height: 38vh; border-right: none; border-bottom: 1px solid var(--border); }
+      .playback-panel { padding: 8px 10px 10px; gap: 8px; }
+      .pb-stats { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+      .pb-stat { padding: 6px 7px 5px; }
+      .pb-stat-label { font-size: 8px; letter-spacing: 0.04em; }
+      .pb-stat-value { font-size: 13px; }
+      .pb-stat-unit, .pb-stat-max { font-size: 9px; }
+      .pb-chart { height: 80px; padding: 4px 6px; }
+      .pb-btn { padding: 5px 9px; font-size: 10px; }
     }
-    @media (max-width: 520px) {
-      .gauges-strip { grid-template-columns: repeat(2, 1fr); }
-      .pb-btn { padding: 8px 14px; font-size: 12px; }
+    @media (max-width: 420px) {
+      .pb-stats { grid-template-columns: repeat(3, 1fr); }
+      .pb-point-info { display: none; }
     }
   </style>
   <style>
@@ -651,104 +706,89 @@
         </div>
       </div>
 
-      <!-- Right: Map -->
-      <div class="viewer-map">
-        <div id="viewerMap"></div>
-        <div class="map-legend" id="mapLegend"></div>
+      <!-- Right: Map + playback -->
+      <div class="viewer-right">
+        <div class="viewer-map">
+          <div id="viewerMap"></div>
+          <div class="map-legend" id="mapLegend"></div>
+        </div>
+
+        <!-- ═══ Compact Playback Panel ═══ -->
+        <section class="playback-panel" id="playbackPanel">
+          <div class="pb-stats">
+            <div class="pb-stat" data-metric="time">
+              <div class="pb-stat-label">Tiempo</div>
+              <div class="pb-stat-row">
+                <span class="pb-stat-value" data-value>00:00:00</span>
+                <span class="pb-stat-max">/ <span data-max>—</span></span>
+              </div>
+              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+            </div>
+
+            <div class="pb-stat" data-metric="distance">
+              <div class="pb-stat-label">Distancia</div>
+              <div class="pb-stat-row">
+                <span class="pb-stat-value" data-value>0.000</span>
+                <span class="pb-stat-unit">km</span>
+                <span class="pb-stat-max">/ <span data-max>—</span></span>
+              </div>
+              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+            </div>
+
+            <div class="pb-stat" data-metric="speed">
+              <div class="pb-stat-label">Velocidad</div>
+              <div class="pb-stat-row">
+                <span class="pb-stat-value" data-value>0.0</span>
+                <span class="pb-stat-unit">km/h</span>
+                <span class="pb-stat-max">máx <span data-max>—</span></span>
+              </div>
+              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+            </div>
+
+            <div class="pb-stat" data-metric="elevation">
+              <div class="pb-stat-label">Elevación</div>
+              <div class="pb-stat-row">
+                <span class="pb-stat-value" data-value>0.0</span>
+                <span class="pb-stat-unit">m</span>
+                <span class="pb-stat-max"><span data-min>—</span>–<span data-max>—</span></span>
+              </div>
+              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+            </div>
+
+            <div class="pb-stat" data-metric="grade">
+              <div class="pb-stat-label">Pendiente</div>
+              <div class="pb-stat-row">
+                <span class="pb-stat-value" data-value>0.0</span>
+                <span class="pb-stat-unit">%</span>
+                <span class="pb-stat-max"><span data-min>—</span>–<span data-max>—</span></span>
+              </div>
+              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+            </div>
+          </div>
+
+          <div class="pb-chart">
+            <canvas id="playbackChart"></canvas>
+          </div>
+
+          <div class="pb-controls">
+            <span class="pb-point-info">
+              Punto <strong id="pbIndex">0</strong>/<strong id="pbTotal">0</strong>
+              · <strong id="pbTimestamp">—</strong>
+            </span>
+            <div class="pb-transport">
+              <select class="pb-speed" id="pbSpeed">
+                <option value="50">Rápido</option>
+                <option value="300" selected>Normal</option>
+                <option value="800">Lento</option>
+              </select>
+              <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>▶ Play</button>
+              <button class="pb-btn pb-btn-pause" id="pbPause" disabled>❚❚</button>
+              <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>■</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
-
-    <!-- ═══ Playback Panel ═══ -->
-    <section class="playback-panel" id="playbackPanel">
-      <div class="gauges-strip">
-        <div class="gauge" id="gauge-time">
-          <div class="gauge-label">Time</div>
-          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
-            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
-                  stroke="var(--text-muted)"
-                  stroke-dasharray="126" stroke-dashoffset="126"/>
-          </svg>
-          <div class="gauge-value" data-value>00:00:00</div>
-          <div class="gauge-unit">hh:mm:ss</div>
-          <div class="gauge-range"><span data-min>00:00:00</span><span data-max>—</span></div>
-        </div>
-
-        <div class="gauge" id="gauge-distance">
-          <div class="gauge-label">Distance</div>
-          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
-            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
-                  stroke="var(--text-muted)"
-                  stroke-dasharray="126" stroke-dashoffset="126"/>
-          </svg>
-          <div class="gauge-value" data-value>0.000</div>
-          <div class="gauge-unit">km</div>
-          <div class="gauge-range"><span data-min>0</span><span data-max>—</span></div>
-        </div>
-
-        <div class="gauge" id="gauge-speed">
-          <div class="gauge-label">Speed</div>
-          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
-            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
-                  stroke="var(--accent)"
-                  stroke-dasharray="126" stroke-dashoffset="126"/>
-          </svg>
-          <div class="gauge-value" data-value>0.00</div>
-          <div class="gauge-unit">km/h</div>
-          <div class="gauge-range"><span data-min>0</span><span data-max>—</span></div>
-        </div>
-
-        <div class="gauge" id="gauge-elevation">
-          <div class="gauge-label">Elevation</div>
-          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
-            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
-                  stroke="#22c55e"
-                  stroke-dasharray="126" stroke-dashoffset="126"/>
-          </svg>
-          <div class="gauge-value" data-value>0.0</div>
-          <div class="gauge-unit">m</div>
-          <div class="gauge-range"><span data-min>—</span><span data-max>—</span></div>
-        </div>
-
-        <div class="gauge" id="gauge-grade">
-          <div class="gauge-label">Elev. Grade</div>
-          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
-            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
-            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
-                  stroke="#eab308"
-                  stroke-dasharray="126" stroke-dashoffset="126"/>
-          </svg>
-          <div class="gauge-value" data-value>0.0</div>
-          <div class="gauge-unit">%</div>
-          <div class="gauge-range"><span data-min>—</span><span data-max>—</span></div>
-        </div>
-      </div>
-
-      <div class="chart-wrap">
-        <canvas id="playbackChart"></canvas>
-      </div>
-
-      <div class="playback-controls">
-        <label class="playback-info" style="display:flex;align-items:center;gap:6px;">
-          Velocidad de reproducción
-          <select class="playback-speed-select" id="pbSpeed">
-            <option value="50">Rápido</option>
-            <option value="300" selected>Normal</option>
-            <option value="800">Lento</option>
-          </select>
-        </label>
-        <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>▶ Play</button>
-        <button class="pb-btn pb-btn-pause" id="pbPause" disabled>❚❚ Pause</button>
-        <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>■ Stop</button>
-      </div>
-
-      <div class="playback-info">
-        Punto <strong id="pbIndex">0</strong> de <strong id="pbTotal">0</strong> · <strong id="pbTimestamp">—</strong>
-      </div>
-    </section>
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
