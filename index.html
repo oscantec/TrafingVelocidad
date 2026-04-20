@@ -2,161 +2,888 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TrafingVelocidad — NextCan Tráfico</title>
-  <meta name="description" content="Sistema de Tracking GPS y Segmentación de Tramos para ingeniería de transporte — NextCan Tráfico">
-  <link rel="stylesheet" href="css/styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#FFFFFF">
+  <title>Softrafing Velocidades — Panel de Administración</title>
+  <meta name="description" content="Panel de administración de Softrafing Velocidades — NextCan Tráfico">
+  <link rel="icon" href="Images/Softrafingvel.png" type="image/png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
   <style>
-    .landing-hero {
-      flex: 1;
+    :root {
+      --bg:           #F3F5F8;
+      --surface:      #FFFFFF;
+      --surface-alt:  #F8FAFC;
+      --border:       #E4E8EE;
+      --border-soft:  #EEF1F5;
+
+      --text:         #0F172A;
+      --text-soft:    #475569;
+      --text-muted:   #94A3B8;
+
+      --accent:       #F05A1A;
+      --accent-soft:  #FFF1E8;
+      --accent-hover: #D94E14;
+
+      --r-sm: 6px;
+      --r-md: 10px;
+      --r-lg: 14px;
+      --r-xl: 18px;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
+
+      --sidebar-w: 260px;
+      --topbar-h: 60px;
+      --bottomnav-h: 64px;
+
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left:   env(safe-area-inset-left, 0px);
+      --safe-right:  env(safe-area-inset-right, 0px);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.45;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    img { display: block; max-width: 100%; }
+
+    /* ── Top Bar ──────────────────────────────────────── */
+    .topbar {
+      height: var(--topbar-h);
+      padding: 0 18px;
+      padding-top: var(--safe-top);
+      height: calc(var(--topbar-h) + var(--safe-top));
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
       display: flex;
-      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: var(--sp-3xl) var(--sp-xl);
+      justify-content: space-between;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
     }
 
-    .landing-title {
-      text-align: center;
-      margin-bottom: var(--sp-3xl);
-      animation: slide-up 0.6s var(--ease-out);
-    }
-
-    .landing-title h1 {
-      font-size: var(--fs-3xl);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: var(--sp-md);
-    }
-
-    .landing-title h1 em {
-      font-style: normal;
-      color: var(--accent);
-    }
-
-    .landing-title p {
-      font-size: var(--fs-base);
-      color: var(--text-secondary);
-      max-width: 500px;
-      margin: 0 auto;
-      line-height: 1.7;
-    }
-
-    .version-tag {
+    .chip {
       display: inline-flex;
       align-items: center;
-      gap: var(--sp-sm);
-      padding: 4px 12px;
+      gap: 8px;
+      padding: 8px 14px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--r-full);
-      font-size: var(--fs-xs);
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-      margin-bottom: var(--sp-xl);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      transition: background 150ms var(--ease), border-color 150ms var(--ease);
     }
 
-    .version-tag .dot {
-      width: 5px;
-      height: 5px;
-      background: var(--accent);
-      border-radius: 50%;
-    }
+    .chip:hover { background: var(--surface-alt); }
+    .chip:active { transform: scale(0.98); }
 
-    .module-card .module-features {
+    .chip .icon { color: var(--accent); flex-shrink: 0; }
+    .chip.chip-plain .icon { color: var(--text-soft); }
+
+    .topbar-right {
       display: flex;
-      flex-wrap: wrap;
-      gap: var(--sp-sm);
-      justify-content: center;
-      margin-top: var(--sp-lg);
+      align-items: center;
+      gap: 10px;
     }
 
-    .module-card .feature-tag {
+    .topbar-user {
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text);
+      padding: 0 4px;
+    }
+
+    /* ── Layout Grid ──────────────────────────────────── */
+    .shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-w) 1fr;
+      min-height: calc(100vh - var(--topbar-h) - var(--safe-top));
+    }
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 12px 24px;
+      gap: 12px;
+      position: sticky;
+      top: calc(var(--topbar-h) + var(--safe-top));
+      align-self: start;
+      height: calc(100vh - var(--topbar-h) - var(--safe-top));
+    }
+
+    .sidebar-logo {
+      padding: 16px 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sidebar-logo img {
+      max-height: 150px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .sidebar-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 4px 0;
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: var(--r-md);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-soft);
+      position: relative;
+      transition: background 150ms var(--ease), color 150ms var(--ease);
+    }
+
+    .nav-item:hover { background: var(--surface-alt); color: var(--text); }
+
+    .nav-item.active {
+      color: var(--accent);
+      background: transparent;
+    }
+
+    .nav-item.active::after {
+      content: '';
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 0;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .nav-item .icon { flex-shrink: 0; opacity: 0.9; }
+
+    /* ── Main Content ─────────────────────────────────── */
+    .main {
+      padding: 28px 36px 60px;
+      min-width: 0;
+    }
+
+    .page { display: none; animation: fade-in 240ms var(--ease); }
+    .page.active { display: block; }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 20px;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Stats Grid ───────────────────────────────────── */
+    .stats-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .stat-cell {
+      padding: 18px 22px;
+      border-right: 1px solid var(--border-soft);
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .stat-cell:nth-child(3n) { border-right: none; }
+    .stat-cell:nth-last-child(-n+3) { border-bottom: none; }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-soft);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    /* ── Activity Row ─────────────────────────────────── */
+    .activity-row {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 14px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: var(--shadow-sm);
+      font-size: 14px;
+      flex-wrap: wrap;
+    }
+
+    .activity-label {
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+
+    .activity-content {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .activity-content .sep {
+      color: var(--text-muted);
+      margin: 0 6px;
+      font-weight: 400;
+    }
+
+    /* ── Generic Panels ───────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .panel + .panel { margin-top: 16px; }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+    }
+
+    .empty {
+      padding: 22px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ── User / Activity Lists ────────────────────────── */
+    .list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .list-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 4px;
+      border-bottom: 1px solid var(--border-soft);
+      font-size: 13px;
+    }
+
+    .list-row:last-child { border-bottom: none; }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    .list-row-main { flex: 1; min-width: 0; }
+    .list-row-title { font-weight: 600; color: var(--text); }
+    .list-row-meta  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .tag {
       padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .tag.tag-muted { background: var(--surface-alt); color: var(--text-muted); }
+
+    /* ── Parameters Form ──────────────────────────────── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-soft);
+    }
+
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
       background: var(--surface-alt);
       border: 1px solid var(--border);
-      border-radius: var(--r-full);
-      font-size: 10px;
-      font-family: var(--font-mono);
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
+      border-radius: var(--r-md);
+      font-size: 14px;
+      color: var(--text);
+      transition: border-color 150ms var(--ease);
+    }
+
+    .field input:focus, .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: var(--r-md);
+      font-weight: 600;
+      font-size: 13px;
+      transition: background 150ms var(--ease);
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:active { transform: scale(0.98); }
+
+    /* ── Bottom Nav (Mobile) ──────────────────────────── */
+    .bottom-nav { display: none; }
+
+    /* ── Responsive ───────────────────────────────────── */
+    @media (max-width: 860px) {
+      :root { --topbar-h: 56px; }
+
+      .topbar { padding: 0 12px; gap: 6px; }
+
+      .topbar .chip-panel-admin .label { display: none; }
+      .topbar .chip-logout .label { display: none; }
+      .topbar .chip-operator .label-full { display: none; }
+      .topbar-user { display: none; }
+
+      .chip-operator .label-short { display: inline; }
+
+      .chip { padding: 8px 10px; font-size: 12px; }
+
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar { display: none; }
+
+      .main {
+        padding: 16px 14px calc(var(--bottomnav-h) + var(--safe-bottom) + 20px);
+      }
+
+      /* Mobile branding under topbar */
+      .mobile-brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px 10px 10px;
+      }
+
+      .mobile-brand img {
+        max-height: 90px;
+        width: auto;
+      }
+
+      .page-title {
+        font-size: 19px;
+        margin-bottom: 14px;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .stat-cell {
+        padding: 14px 16px;
+        border-right: 1px solid var(--border-soft);
+        border-bottom: 1px solid var(--border-soft);
+      }
+
+      .stat-cell:nth-child(3n) { border-right: 1px solid var(--border-soft); }
+      .stat-cell:nth-child(2n) { border-right: none; }
+      .stat-cell:nth-last-child(-n+3) { border-bottom: 1px solid var(--border-soft); }
+      .stat-cell:nth-last-child(-n+2) { border-bottom: none; }
+      .stat-cell:nth-last-child(1):nth-child(odd) { border-right: none; }
+
+      .stat-value { font-size: 24px; }
+      .stat-label { font-size: 12px; }
+
+      .activity-row { padding: 12px 16px; font-size: 13px; }
+
+      .panel { padding: 16px; }
+
+      /* Bottom nav */
+      .bottom-nav {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding-bottom: var(--safe-bottom);
+        z-index: 40;
+        box-shadow: 0 -2px 12px rgba(15,23,42,0.04);
+      }
+
+      .bottom-nav .nav-item {
+        flex-direction: column;
+        gap: 3px;
+        padding: 10px 4px;
+        font-size: 11px;
+        border-radius: 0;
+        height: var(--bottomnav-h);
+        justify-content: center;
+        text-align: center;
+      }
+
+      .bottom-nav .nav-item.active::after {
+        left: 50%;
+        right: auto;
+        bottom: 6px;
+        width: 22px;
+        height: 2px;
+        transform: translateX(-50%);
+      }
+
+      .bottom-nav .nav-item .icon { width: 20px; height: 20px; }
+    }
+
+    @media (max-width: 400px) {
+      .stat-value { font-size: 22px; }
+      .topbar .chip-operator .label-short { font-size: 11px; }
+    }
+
+    @media (min-width: 861px) {
+      .mobile-brand { display: none; }
+      .chip-operator .label-short { display: none; }
     }
   </style>
 </head>
+
 <body>
-  <div class="app-container">
-    <!-- Header -->
-    <header class="app-header">
-      <div class="logo">
-        <div class="logo-mark">N</div>
-        <div class="logo-text">
-          TrafingVelocidad
-          <span>NextCan Tráfico</span>
-        </div>
-      </div>
-      <div class="badge badge-accent">
-        <span class="badge-dot"></span>
-        Sistema de Velocidad
-      </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="app-main">
-      <div class="landing-hero">
-        <div class="landing-title">
-          <div class="version-tag">
-            <span class="dot"></span>
-            v1.0.0
+  <!-- ══════════════ TOP BAR ══════════════ -->
+  <header class="topbar">
+    <div class="chip chip-panel-admin">
+      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <polyline points="12,7 12,12 15,14"/>
+      </svg>
+      <span class="label">Panel de Administración</span>
+    </div>
+
+    <div class="topbar-right">
+      <span class="topbar-user" id="topbar-user">Administrador</span>
+
+      <a href="capture/capture.html" class="chip chip-operator" title="Abrir app de operador">
+        <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+        <span class="label-full">Ver app de operador</span>
+        <span class="label-short">Operador</span>
+      </a>
+
+      <button class="chip chip-plain chip-logout" id="btn-logout" title="Salir">
+        <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span class="label">Salir</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ══════════════ SHELL ══════════════ -->
+  <div class="shell">
+
+    <!-- ─────── Sidebar (desktop) ─────── -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="Images/Softrafingvel.png" alt="Softrafing Velocidades">
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <a href="#inicio" class="nav-item active" data-page="inicio">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2V9.5z"/>
+          </svg>
+          <span>Inicio</span>
+        </a>
+        <a href="#usuarios" class="nav-item" data-page="usuarios">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <span>Usuarios</span>
+        </a>
+        <a href="#actividad" class="nav-item" data-page="actividad">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          <span>Actividad</span>
+        </a>
+        <a href="#parametros" class="nav-item" data-page="parametros">
+          <svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+          </svg>
+          <span>Parámetros</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ─────── Main Content ─────── -->
+    <main class="main">
+
+      <!-- Mobile branding (only visible on mobile) -->
+      <div class="mobile-brand">
+        <img src="Images/Softrafingvel.png" alt="Softrafing Velocidades">
+      </div>
+
+      <!-- ─── Page: Inicio ─── -->
+      <section class="page active" id="page-inicio">
+        <h1 class="page-title">Inicio</h1>
+
+        <div class="stats-card">
+          <div class="stats-grid">
+            <div class="stat-cell">
+              <div class="stat-label">Usuarios</div>
+              <div class="stat-value" id="stat-users">2</div>
+            </div>
+            <div class="stat-cell">
+              <div class="stat-label">Recorridos</div>
+              <div class="stat-value" id="stat-tracks">0</div>
+            </div>
+            <div class="stat-cell">
+              <div class="stat-label">Puntos GPS</div>
+              <div class="stat-value" id="stat-points">0</div>
+            </div>
+            <div class="stat-cell">
+              <div class="stat-label">Tiempo capturado</div>
+              <div class="stat-value" id="stat-time">0s</div>
+            </div>
+            <div class="stat-cell">
+              <div class="stat-label">Recorridos hoy</div>
+              <div class="stat-value" id="stat-today">0</div>
+            </div>
+            <div class="stat-cell">
+              <div class="stat-label">Completados</div>
+              <div class="stat-value" id="stat-done">0</div>
+            </div>
           </div>
-          <h1>Tracking & <em>Segmentación</em></h1>
-          <p>
-            Captura recorridos GPS de alta precisión y segmenta tramos 
-            automáticamente con nodos de referencia. Diseñado para 
-            ingeniería de transporte.
-          </p>
         </div>
 
-        <div class="module-grid">
-          <!-- Module 1: Capture -->
-          <a href="capture/capture.html" class="module-card card-hover" id="module-capture">
-            <div class="module-icon"><span>📡</span></div>
-            <h2>Captura</h2>
-            <p>
-              Tracking GPS en tiempo real con persistencia local. 
-              Exporta GPX y sincroniza con backend.
-            </p>
-            <div class="module-features">
-              <span class="feature-tag">GPS Hi-Res</span>
-              <span class="feature-tag">IndexedDB</span>
-              <span class="feature-tag">Wake Lock</span>
-              <span class="feature-tag">GPX Export</span>
-            </div>
-          </a>
-
-          <!-- Module 2: Viewer -->
-          <a href="viewer/viewer.html" class="module-card card-hover" id="module-viewer">
-            <div class="module-icon"><span>📊</span></div>
-            <h2>Visor</h2>
-            <p>
-              Carga tracks y nodos de referencia. Segmenta tramos 
-              automáticamente con métricas de ingeniería.
-            </p>
-            <div class="module-features">
-              <span class="feature-tag">Haversine</span>
-              <span class="feature-tag">Segmentar</span>
-              <span class="feature-tag">Leaflet</span>
-              <span class="feature-tag">Métricas</span>
-            </div>
-          </a>
+        <div class="activity-row">
+          <span class="activity-label">Última actividad</span>
+          <span class="activity-content" id="last-activity">Sin registros</span>
         </div>
-      </div>
+      </section>
+
+      <!-- ─── Page: Usuarios ─── -->
+      <section class="page" id="page-usuarios">
+        <h1 class="page-title">Usuarios</h1>
+        <div class="panel">
+          <div class="list" id="users-list">
+            <div class="list-row">
+              <div class="avatar">IC</div>
+              <div class="list-row-main">
+                <div class="list-row-title">IngenieroCante</div>
+                <div class="list-row-meta">Administrador · Activo</div>
+              </div>
+              <span class="tag">Admin</span>
+            </div>
+            <div class="list-row">
+              <div class="avatar">OP</div>
+              <div class="list-row-main">
+                <div class="list-row-title">Operador Campo</div>
+                <div class="list-row-meta">Operador · Activo</div>
+              </div>
+              <span class="tag tag-muted">Operador</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Page: Actividad ─── -->
+      <section class="page" id="page-actividad">
+        <h1 class="page-title">Actividad</h1>
+        <div class="panel">
+          <div class="panel-title">Recorridos registrados</div>
+          <div class="list" id="activity-list">
+            <div class="empty">No hay actividad registrada todavía.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Page: Parámetros ─── -->
+      <section class="page" id="page-parametros">
+        <h1 class="page-title">Parámetros</h1>
+        <div class="panel">
+          <div class="panel-title">Captura GPS</div>
+          <div class="field">
+            <label for="p-freq">Frecuencia de muestreo (segundos)</label>
+            <input id="p-freq" type="number" min="1" max="60" value="1">
+          </div>
+          <div class="field">
+            <label for="p-accuracy">Precisión mínima aceptada (metros)</label>
+            <input id="p-accuracy" type="number" min="1" max="100" value="20">
+          </div>
+          <div class="field">
+            <label for="p-mode">Modo de captura</label>
+            <select id="p-mode">
+              <option value="high">Alta precisión</option>
+              <option value="balanced">Balanceado</option>
+              <option value="battery">Ahorro de batería</option>
+            </select>
+          </div>
+          <button class="btn-primary" id="save-params">Guardar parámetros</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">Almacenamiento local</div>
+          <div class="field">
+            <label>Base de datos</label>
+            <input value="TrafingVelocidadDB" readonly>
+          </div>
+          <button class="btn-primary" id="clear-data" style="background:#DC2626">Borrar datos locales</button>
+        </div>
+      </section>
+
     </main>
 
-    <!-- Footer -->
-    <footer class="app-footer">
-      NextCan Tráfico · TrafingVelocidad v1.0.0 · Sistema de Tracking y Segmentación
-    </footer>
   </div>
+
+  <!-- ─────── Bottom Nav (mobile only) ─────── -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <a href="#inicio" class="nav-item active" data-page="inicio">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2h-4v-7h-6v7H5a2 2 0 0 1-2-2V9.5z"/></svg>
+      <span>Inicio</span>
+    </a>
+    <a href="#usuarios" class="nav-item" data-page="usuarios">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Usuarios</span>
+    </a>
+    <a href="#actividad" class="nav-item" data-page="actividad">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>Actividad</span>
+    </a>
+    <a href="#parametros" class="nav-item" data-page="parametros">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+      <span>Parámetros</span>
+    </a>
+  </nav>
+
+  <script type="module">
+    import { getAllTracks, getPointCount } from './lib/db.js';
+
+    // ── Navigation ─────────────────────────────────
+    function setPage(page) {
+      document.querySelectorAll('.page').forEach(el => {
+        el.classList.toggle('active', el.id === `page-${page}`);
+      });
+      document.querySelectorAll('[data-page]').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === page);
+      });
+      if (location.hash !== `#${page}`) {
+        history.replaceState(null, '', `#${page}`);
+      }
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+
+    document.querySelectorAll('[data-page]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        setPage(el.dataset.page);
+      });
+    });
+
+    const initial = (location.hash || '#inicio').replace('#', '');
+    if (['inicio', 'usuarios', 'actividad', 'parametros'].includes(initial)) {
+      setPage(initial);
+    }
+
+    // ── Format helpers ─────────────────────────────
+    function fmtDuration(ms) {
+      if (!ms || ms < 0) return '0s';
+      const s = Math.floor(ms / 1000);
+      if (s < 60) return `${s}s`;
+      const m = Math.floor(s / 60);
+      if (m < 60) return `${m}m ${s % 60}s`;
+      const h = Math.floor(m / 60);
+      return `${h}h ${m % 60}m`;
+    }
+
+    function fmtDateTime(ts) {
+      if (!ts) return '—';
+      const d = new Date(ts);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    // ── Load stats from IndexedDB ──────────────────
+    async function loadStats() {
+      try {
+        const tracks = await getAllTracks();
+
+        const totalTracks = tracks.length;
+        let totalPoints = 0;
+        let totalTime = 0;
+        let doneCount = 0;
+        let todayCount = 0;
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+        const startOfDayTs = startOfDay.getTime();
+
+        for (const t of tracks) {
+          totalPoints += (t.pointCount || 0);
+          if (t.endTime && t.startTime) totalTime += (t.endTime - t.startTime);
+          if (t.status === 'completed' || t.endTime) doneCount++;
+          if (t.startTime >= startOfDayTs) todayCount++;
+        }
+
+        document.getElementById('stat-tracks').textContent  = totalTracks;
+        document.getElementById('stat-points').textContent  = totalPoints;
+        document.getElementById('stat-time').textContent    = fmtDuration(totalTime);
+        document.getElementById('stat-today').textContent   = todayCount;
+        document.getElementById('stat-done').textContent    = doneCount;
+
+        // Last activity
+        const last = tracks[0];
+        const lastEl = document.getElementById('last-activity');
+        if (last) {
+          lastEl.innerHTML = `${last.name || 'Recorrido'}<span class="sep">·</span>${fmtDateTime(last.startTime)}<span class="sep">·</span>${last.pointCount || 0} puntos`;
+        }
+
+        // Activity list
+        const actList = document.getElementById('activity-list');
+        if (tracks.length) {
+          actList.innerHTML = tracks.slice(0, 30).map(t => `
+            <div class="list-row">
+              <div class="avatar">${(t.name || 'R').slice(0,2).toUpperCase()}</div>
+              <div class="list-row-main">
+                <div class="list-row-title">${escapeHtml(t.name || 'Recorrido sin nombre')}</div>
+                <div class="list-row-meta">${fmtDateTime(t.startTime)} · ${t.pointCount || 0} puntos</div>
+              </div>
+              <span class="tag ${t.endTime ? '' : 'tag-muted'}">${t.endTime ? 'Completado' : 'En curso'}</span>
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        console.warn('[admin] could not load stats:', err);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
+    }
+
+    // ── Parameters persistence ────────────────────
+    const PARAMS_KEY = 'trafingvel:params';
+    function loadParams() {
+      try {
+        const raw = localStorage.getItem(PARAMS_KEY);
+        if (!raw) return;
+        const p = JSON.parse(raw);
+        if (p.freq)     document.getElementById('p-freq').value     = p.freq;
+        if (p.accuracy) document.getElementById('p-accuracy').value = p.accuracy;
+        if (p.mode)     document.getElementById('p-mode').value     = p.mode;
+      } catch {}
+    }
+    document.getElementById('save-params').addEventListener('click', () => {
+      const p = {
+        freq:     +document.getElementById('p-freq').value,
+        accuracy: +document.getElementById('p-accuracy').value,
+        mode:     document.getElementById('p-mode').value,
+      };
+      localStorage.setItem(PARAMS_KEY, JSON.stringify(p));
+      const btn = document.getElementById('save-params');
+      const orig = btn.textContent;
+      btn.textContent = 'Guardado ✓';
+      setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
+
+    document.getElementById('clear-data').addEventListener('click', async () => {
+      if (!confirm('¿Borrar todos los recorridos y puntos almacenados localmente?')) return;
+      indexedDB.deleteDatabase('TrafingVelocidadDB');
+      setTimeout(() => location.reload(), 500);
+    });
+
+    // ── Logout ────────────────────────────────────
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      if (confirm('¿Salir del panel?')) location.reload();
+    });
+
+    loadParams();
+    loadStats();
+  </script>
 </body>
 </html>
