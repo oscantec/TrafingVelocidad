@@ -13,6 +13,7 @@ const ASSETS = [
   './capture/capture.js',
   './viewer/viewer.html',
   './viewer/viewer.js',
+  './viewer/playback.js',
   './css/styles.css',
   './lib/db.js',
   './lib/geo.js',

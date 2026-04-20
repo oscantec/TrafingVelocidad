@@ -11,6 +11,9 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Chart.js for the speed/elevation plot -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="manifest" href="../manifest.webmanifest">
@@ -36,6 +39,150 @@
       background: var(--surface);
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    /* ── Playback Panel ─────────────────────────────────── */
+    .playback-panel {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: var(--sp-lg) var(--sp-xl);
+      display: none;
+      flex-direction: column;
+      gap: var(--sp-lg);
+    }
+    .playback-panel.active { display: flex; }
+
+    .gauges-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: var(--sp-md);
+    }
+
+    .gauge {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: 10px 10px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .gauge-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .gauge svg {
+      width: 100%;
+      max-width: 160px;
+      height: auto;
+      display: block;
+    }
+
+    .gauge-value {
+      font-family: var(--font-mono);
+      font-size: var(--fs-lg);
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1.1;
+      margin-top: -8px;
+    }
+
+    .gauge-unit {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-weight: 500;
+    }
+
+    .gauge-range {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 160px;
+      font-size: 9px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      margin-top: 2px;
+    }
+
+    .gauge .arc-bg  { stroke: var(--border); stroke-width: 10; fill: none; stroke-linecap: round; }
+    .gauge .arc-fg  { stroke-width: 10; fill: none; stroke-linecap: round;
+                      transition: stroke-dashoffset 0.35s var(--ease-out), stroke 0.3s; }
+
+    /* Chart */
+    .chart-wrap {
+      position: relative;
+      height: 240px;
+      width: 100%;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      padding: var(--sp-md);
+    }
+
+    /* Playback controls */
+    .playback-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--sp-md);
+      flex-wrap: wrap;
+    }
+
+    .playback-speed-select {
+      padding: 8px 12px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-md);
+      color: var(--text-primary);
+      font-size: var(--fs-xs);
+      font-weight: 600;
+      font-family: var(--font-sans);
+    }
+
+    .pb-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: var(--r-md);
+      font-weight: 700;
+      font-size: var(--fs-sm);
+      border: 1px solid transparent;
+      transition: all var(--t-fast);
+    }
+    .pb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pb-btn-play   { background: var(--success);  color: #fff; }
+    .pb-btn-play:hover:not(:disabled)   { filter: brightness(1.08); }
+    .pb-btn-pause  { background: var(--warning);  color: #fff; }
+    .pb-btn-pause:hover:not(:disabled)  { filter: brightness(1.08); }
+    .pb-btn-stop   { background: var(--danger);   color: #fff; }
+    .pb-btn-stop:hover:not(:disabled)   { filter: brightness(1.08); }
+
+    .playback-info {
+      text-align: center;
+      font-size: var(--fs-xs);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .playback-info strong { color: var(--text-primary); font-family: var(--font-mono); }
+
+    @media (max-width: 900px) {
+      .playback-panel { padding: var(--sp-md); gap: var(--sp-md); }
+      .gauges-strip { grid-template-columns: repeat(3, 1fr); }
+      .gauge { padding: 8px 6px 10px; }
+      .gauge-value { font-size: var(--fs-md); }
+      .chart-wrap { height: 200px; padding: var(--sp-sm); }
+    }
+    @media (max-width: 520px) {
+      .gauges-strip { grid-template-columns: repeat(2, 1fr); }
+      .pb-btn { padding: 8px 14px; font-size: 12px; }
     }
   </style>
   <style>
@@ -510,6 +657,98 @@
         <div class="map-legend" id="mapLegend"></div>
       </div>
     </div>
+
+    <!-- ═══ Playback Panel ═══ -->
+    <section class="playback-panel" id="playbackPanel">
+      <div class="gauges-strip">
+        <div class="gauge" id="gauge-time">
+          <div class="gauge-label">Time</div>
+          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
+                  stroke="var(--text-muted)"
+                  stroke-dasharray="126" stroke-dashoffset="126"/>
+          </svg>
+          <div class="gauge-value" data-value>00:00:00</div>
+          <div class="gauge-unit">hh:mm:ss</div>
+          <div class="gauge-range"><span data-min>00:00:00</span><span data-max>—</span></div>
+        </div>
+
+        <div class="gauge" id="gauge-distance">
+          <div class="gauge-label">Distance</div>
+          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
+                  stroke="var(--text-muted)"
+                  stroke-dasharray="126" stroke-dashoffset="126"/>
+          </svg>
+          <div class="gauge-value" data-value>0.000</div>
+          <div class="gauge-unit">km</div>
+          <div class="gauge-range"><span data-min>0</span><span data-max>—</span></div>
+        </div>
+
+        <div class="gauge" id="gauge-speed">
+          <div class="gauge-label">Speed</div>
+          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
+                  stroke="var(--accent)"
+                  stroke-dasharray="126" stroke-dashoffset="126"/>
+          </svg>
+          <div class="gauge-value" data-value>0.00</div>
+          <div class="gauge-unit">km/h</div>
+          <div class="gauge-range"><span data-min>0</span><span data-max>—</span></div>
+        </div>
+
+        <div class="gauge" id="gauge-elevation">
+          <div class="gauge-label">Elevation</div>
+          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
+                  stroke="#22c55e"
+                  stroke-dasharray="126" stroke-dashoffset="126"/>
+          </svg>
+          <div class="gauge-value" data-value>0.0</div>
+          <div class="gauge-unit">m</div>
+          <div class="gauge-range"><span data-min>—</span><span data-max>—</span></div>
+        </div>
+
+        <div class="gauge" id="gauge-grade">
+          <div class="gauge-label">Elev. Grade</div>
+          <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet">
+            <path class="arc-bg" d="M 10 50 A 40 40 0 0 1 90 50"/>
+            <path class="arc-fg" d="M 10 50 A 40 40 0 0 1 90 50"
+                  stroke="#eab308"
+                  stroke-dasharray="126" stroke-dashoffset="126"/>
+          </svg>
+          <div class="gauge-value" data-value>0.0</div>
+          <div class="gauge-unit">%</div>
+          <div class="gauge-range"><span data-min>—</span><span data-max>—</span></div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="playbackChart"></canvas>
+      </div>
+
+      <div class="playback-controls">
+        <label class="playback-info" style="display:flex;align-items:center;gap:6px;">
+          Velocidad de reproducción
+          <select class="playback-speed-select" id="pbSpeed">
+            <option value="50">Rápido</option>
+            <option value="300" selected>Normal</option>
+            <option value="800">Lento</option>
+          </select>
+        </label>
+        <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>▶ Play</button>
+        <button class="pb-btn pb-btn-pause" id="pbPause" disabled>❚❚ Pause</button>
+        <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>■ Stop</button>
+      </div>
+
+      <div class="playback-info">
+        Punto <strong id="pbIndex">0</strong> de <strong id="pbTotal">0</strong> · <strong id="pbTimestamp">—</strong>
+      </div>
+    </section>
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>

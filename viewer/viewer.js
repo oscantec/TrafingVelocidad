@@ -11,6 +11,7 @@ import {
 } from '../lib/geo.js';
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection } from '../lib/supabase.js';
+import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
 let trackPoints = [];       // Current track points
@@ -71,6 +72,7 @@ async function init() {
   initMap();
   bindEvents();
   loadTrackList();
+  initPlayback(map);
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -264,6 +266,9 @@ function loadTrackData(points) {
 
   // Draw track on map
   drawBaseTrack(points);
+
+  // Wire up the playback panel (gauges, chart, transport controls)
+  loadPlaybackTrack(points);
 
   // Enable process button if nodes also loaded
   updateProcessButton();
