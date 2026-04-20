@@ -8,7 +8,7 @@
 import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, getUnsyncedTracks, deleteTrack } from '../lib/db.js';
 import { haversineDistance, totalDistance, formatDistance, formatDuration, formatSpeed } from '../lib/geo.js';
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
-import { syncTrackToCloud, testConnection } from '../lib/supabase.js';
+import { syncTrackToCloud, testConnection, testWritePermission } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -80,7 +80,33 @@ const el = {
   stopModal: $('stopModal'),
   stopConfirm: $('stopConfirm'),
   stopCancel: $('stopCancel'),
+  rlsModal: $('rlsModal'),
+  rlsSql: $('rlsSql'),
+  rlsCopy: $('rlsCopy'),
+  rlsClose: $('rlsClose'),
+  rlsRetry: $('rlsRetry'),
 };
+
+const RLS_SETUP_SQL = `alter table public.tracks     enable row level security;
+alter table public.gps_points enable row level security;
+
+drop policy if exists "anon read tracks"      on public.tracks;
+drop policy if exists "anon write tracks"     on public.tracks;
+drop policy if exists "anon update tracks"    on public.tracks;
+drop policy if exists "anon read gps_points"  on public.gps_points;
+drop policy if exists "anon write gps_points" on public.gps_points;
+
+create policy "anon read tracks"      on public.tracks     for select using (true);
+create policy "anon write tracks"     on public.tracks     for insert with check (true);
+create policy "anon update tracks"    on public.tracks     for update using (true) with check (true);
+create policy "anon read gps_points"  on public.gps_points for select using (true);
+create policy "anon write gps_points" on public.gps_points for insert with check (true);
+create policy "anon delete gps_points" on public.gps_points for delete using (true);
+
+alter table public.tracks add column if not exists local_id text unique;
+alter table public.tracks add column if not exists point_count integer default 0;
+alter table public.tracks add column if not exists altitude   numeric;
+alter table public.gps_points add column if not exists altitude numeric;`;
 
 // ── Initialize ───────────────────────────────────────────────
 async function init() {
@@ -102,13 +128,23 @@ async function init() {
 // ── Cloud Probe ──────────────────────────────────────────────
 async function probeCloudConnection() {
   setStatus(el.statusSync, 'warning', 'Nube: Probando...');
-  const { ok, error } = await testConnection();
-  if (ok) {
-    setStatus(el.statusSync, 'active', 'Nube: Conectado');
-  } else {
+
+  const read = await testConnection();
+  if (!read.ok) {
     setStatus(el.statusSync, 'error', 'Nube: Sin conexión');
-    console.warn('[cloud] probe failed:', error);
+    console.warn('[cloud] read probe failed:', read.error);
+    return;
   }
+
+  const write = await testWritePermission();
+  if (write.ok) {
+    setStatus(el.statusSync, 'active', 'Nube: Lista');
+    return;
+  }
+
+  setStatus(el.statusSync, 'error', 'Nube: Falta RLS');
+  console.warn('[cloud] write probe failed:', write.error);
+  handleSyncError(write.error);
 }
 
 // ── Auto-sync any leftover tracks from prior sessions ───────
@@ -314,6 +350,29 @@ function bindEvents() {
     if (e.target === el.stopModal) closeStopModal();
   });
 
+  // Modal: RLS setup
+  el.rlsSql.textContent = RLS_SETUP_SQL;
+  el.rlsCopy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(RLS_SETUP_SQL);
+      el.rlsCopy.textContent = '✓ Copiado';
+      setTimeout(() => { el.rlsCopy.textContent = '📋 Copiar SQL'; }, 1800);
+    } catch {
+      // Fallback: select the text
+      const range = document.createRange();
+      range.selectNode(el.rlsSql);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+    }
+  });
+  el.rlsClose.addEventListener('click', () => el.rlsModal.classList.remove('active'));
+  el.rlsRetry.addEventListener('click', async () => {
+    el.rlsModal.classList.remove('active');
+    await probeCloudConnection();
+    await autoSyncPending();
+    if (currentTrackId && pointCount > 0) await syncCurrentTrack();
+  });
+
   // Visibility / background handling
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -466,12 +525,31 @@ async function syncCurrentTrack() {
       showToast(`Recorrido sincronizado (${points.length} puntos)`, 'success');
     } else {
       setStatus(el.statusSync, 'error', 'Nube: Error');
-      showToast(`Error al sincronizar: ${result.error}`, 'error', 6000);
+      handleSyncError(result.error);
     }
   } catch (err) {
     console.error('[Sync] Error:', err);
     setStatus(el.statusSync, 'error', 'Nube: Error');
-    showToast(`Error al sincronizar: ${err.message || err}`, 'error', 6000);
+    handleSyncError(err.message || String(err));
+  }
+}
+
+function handleSyncError(errMsg) {
+  const msg = String(errMsg || '').toLowerCase();
+  // 42501 = RLS violation; also detect missing columns / missing tables
+  const isRlsOrSchema =
+    msg.includes('row-level security') ||
+    msg.includes('42501') ||
+    msg.includes('does not exist') ||
+    msg.includes('column') ||
+    msg.includes('local_id') ||
+    msg.includes('point_count');
+
+  if (isRlsOrSchema) {
+    el.rlsModal.classList.add('active');
+    showToast('Falta configurar permisos en Supabase — ver instrucciones', 'warning', 6000);
+  } else {
+    showToast(`Error al sincronizar: ${errMsg}`, 'error', 6000);
   }
 }
 

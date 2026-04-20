@@ -10,6 +10,7 @@ import {
   formatDistance, formatDuration, formatSpeed, generateSegmentColors,
 } from '../lib/geo.js';
 import { parseGPX, parseNodesFile, readFileAsText } from '../lib/gpx.js';
+import { listCloudTracks, getCloudTrackPoints, testConnection } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 let trackPoints = [];       // Current track points
@@ -107,36 +108,79 @@ function bindEvents() {
   });
 }
 
-// ── Track Loading ────────────────────────────────────────────
+// ── Track Loading (local IndexedDB + Supabase cloud) ────────
 async function loadTrackList() {
-  try {
-    const tracks = await getAllTracks();
-    el.trackSelect.innerHTML = '<option value="">— Seleccionar recorrido —</option>';
+  const fmtDate = (ts) => new Date(ts).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
 
-    for (const track of tracks) {
+  let localTracks = [];
+  try { localTracks = await getAllTracks(); } catch {}
+
+  // Fetch cloud tracks in parallel; tolerate failure (RLS / offline)
+  let cloudTracks = [];
+  try { cloudTracks = await listCloudTracks(); } catch {}
+
+  const localIds = new Set(localTracks.map((t) => t.id));
+
+  el.trackSelect.innerHTML = '<option value="">— Seleccionar recorrido —</option>';
+
+  if (localTracks.length) {
+    const grpLocal = document.createElement('optgroup');
+    grpLocal.label = '💾 Local';
+    for (const t of localTracks) {
       const opt = document.createElement('option');
-      opt.value = track.id;
-      const date = new Date(track.startTime).toLocaleString('es', { 
-        dateStyle: 'short', timeStyle: 'short' 
-      });
-      opt.textContent = `${track.name} (${date}) · ${track.pointCount || '?'} pts`;
-      el.trackSelect.appendChild(opt);
+      opt.value = `local:${t.id}`;
+      const cloudMark = t.synced ? ' ☁' : '';
+      opt.textContent = `${t.name}${cloudMark} · ${fmtDate(t.startTime)} · ${t.pointCount || '?'} pts`;
+      grpLocal.appendChild(opt);
     }
-  } catch {
-    // DB not available
+    el.trackSelect.appendChild(grpLocal);
+  }
+
+  // Cloud-only tracks (captured on another device / browser)
+  const cloudOnly = cloudTracks.filter((t) => !t.local_id || !localIds.has(t.local_id));
+  if (cloudOnly.length) {
+    const grpCloud = document.createElement('optgroup');
+    grpCloud.label = '☁ Nube (otros dispositivos)';
+    for (const t of cloudOnly) {
+      const opt = document.createElement('option');
+      opt.value = `cloud:${t.id}`;
+      opt.textContent = `${t.name} · ${fmtDate(t.start_time)} · ${t.point_count || '?'} pts`;
+      grpCloud.appendChild(opt);
+    }
+    el.trackSelect.appendChild(grpCloud);
+  }
+
+  if (!localTracks.length && !cloudOnly.length) {
+    el.trackSelect.innerHTML += '<option disabled>Sin recorridos — captura uno primero</option>';
   }
 }
 
 async function handleTrackSelect() {
-  const trackId = el.trackSelect.value;
-  if (!trackId) return;
+  const raw = el.trackSelect.value;
+  if (!raw) return;
 
+  const [origin, id] = raw.split(':');
   try {
-    const points = await getTrackPoints(trackId);
+    let points;
+    if (origin === 'cloud') {
+      const cloud = await getCloudTrackPoints(id);
+      points = cloud.map((p) => ({
+        lat: p.lat,
+        lng: p.lng,
+        speed: p.speed ?? 0,
+        accuracy: p.accuracy ?? null,
+        altitude: p.altitude ?? null,
+        timestamp: new Date(p.timestamp).getTime(),
+      }));
+      showToast(`Track ☁ cargado desde la nube: ${points.length} puntos`, 'success');
+    } else {
+      points = await getTrackPoints(id);
+      showToast(`Track cargado: ${points.length} puntos`, 'success');
+    }
     loadTrackData(points);
-    showToast(`Track cargado: ${points.length} puntos`, 'success');
   } catch (err) {
-    showToast('Error cargando track desde DB', 'error');
+    console.error('[viewer] track select error:', err);
+    showToast(`Error cargando track: ${err.message || err}`, 'error');
   }
 }
 

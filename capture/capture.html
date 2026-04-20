@@ -476,6 +476,39 @@
       </div>
     </div>
 
+    <!-- Supabase RLS Setup Modal -->
+    <div class="modal-overlay" id="rlsModal">
+      <div class="modal" style="max-width:640px;">
+        <div class="modal-title">⚙ Configuración de Supabase pendiente</div>
+        <div class="modal-body">
+          <p style="margin-bottom:12px;">
+            Las tablas <code>tracks</code> y <code>gps_points</code> existen en Supabase, pero
+            la política de <strong>Row-Level Security</strong> no permite escribir con la anon key.
+            Por seguridad de Supabase, solo el dueño del proyecto (tú) puede crear políticas.
+          </p>
+          <p style="margin-bottom:12px;">
+            Ejecuta este SQL una sola vez. Tarda 10 segundos:
+          </p>
+          <pre id="rlsSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
+          <div class="btn-group" style="margin-top:12px;">
+            <button class="btn btn-sm btn-primary" id="rlsCopy">📋 Copiar SQL</button>
+            <a class="btn btn-sm btn-secondary"
+               href="https://supabase.com/dashboard/project/wqewsreqemthzaecpiqu/sql/new"
+               target="_blank" rel="noopener">
+              ↗ Abrir SQL Editor
+            </a>
+          </div>
+          <p style="margin-top:14px;font-size:11px;color:var(--text-muted);">
+            Tras ejecutarlo, vuelve aquí y pulsa "Reintentar sincronización".
+          </p>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="rlsClose">Cerrar</button>
+          <button class="btn btn-primary" id="rlsRetry">Reintentar sincronización</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Stop Confirm Modal -->
     <div class="modal-overlay" id="stopModal">
       <div class="modal">
