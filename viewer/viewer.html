@@ -14,6 +14,9 @@
 
   <!-- Chart.js for the speed/elevation plot -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Arrow-head decorations on the track polyline -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.min.js"></script>
   
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="manifest" href="../manifest.webmanifest">
@@ -605,27 +608,39 @@
             </div>
           </div>
 
-          <!-- Reference Nodes -->
+          <!-- Reference Nodes (Puntos de Control) -->
           <div class="viewer-panel-section">
             <div class="section-header">
               <div class="section-icon">🎯</div>
-              <h2>Nodos de Referencia</h2>
+              <h2>Puntos de Control</h2>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Cargar CSV / JSON</label>
-              <div class="file-input-wrapper">
-                <input type="file" accept=".csv,.json,.txt" id="nodesFileInput">
-                <div class="file-label">
-                  Formato: <strong>id, name, lat, lng</strong>
-                </div>
+              <label class="form-label">Cargar guardados</label>
+              <div class="track-selector">
+                <select id="savedPointsSelect">
+                  <option value="">— Seleccionar —</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" id="btnRefreshPoints" title="Refrescar">↻</button>
+              </div>
+              <div class="text-xs text-muted" style="margin-top:6px;line-height:1.5;">
+                Elige <strong>Todos</strong> para cargar toda la colección, o un punto específico.
+              </div>
+            </div>
+
+            <div class="form-group">
+              <button class="btn btn-primary w-full" id="btnDrawPoints">
+                ✏ Dibujar en mapa
+              </button>
+              <div id="drawingHint" class="hidden" style="margin-top:8px;padding:8px 10px;background:var(--accent-dim);color:var(--accent);border-radius:var(--r-md);font-size:var(--fs-xs);font-weight:600;line-height:1.5;">
+                Haz clic en el mapa para añadir un punto. Se guarda en la nube.
               </div>
             </div>
 
             <div id="nodesInfo" class="hidden">
               <div class="badge badge-success mb-md">
                 <span class="badge-dot"></span>
-                <span id="nodesCount">0</span> nodos cargados
+                <span id="nodesCount">0</span> puntos cargados
               </div>
               <div class="nodes-list" id="nodesList"></div>
             </div>
@@ -771,6 +786,33 @@
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Supabase control_points setup modal -->
+    <div class="modal-overlay" id="cpSetupModal">
+      <div class="modal" style="max-width:640px;">
+        <div class="modal-title">⚙ Tabla de puntos de control pendiente</div>
+        <div class="modal-body">
+          <p style="margin-bottom:12px;">
+            Para guardar los puntos de control en la nube necesitas crear la tabla
+            <code>control_points</code> en Supabase. Por seguridad, solo el dueño del
+            proyecto (tú) puede crear tablas.
+          </p>
+          <pre id="cpSetupSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
+          <div class="btn-group" style="margin-top:12px;">
+            <button class="btn btn-sm btn-primary" id="cpSetupCopy">📋 Copiar SQL</button>
+            <a class="btn btn-sm btn-secondary"
+               href="https://supabase.com/dashboard/project/wqewsreqemthzaecpiqu/sql/new"
+               target="_blank" rel="noopener">
+              ↗ Abrir SQL Editor
+            </a>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="cpSetupClose">Cerrar</button>
+          <button class="btn btn-primary" id="cpSetupRetry">Reintentar</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="viewer.js"></script>

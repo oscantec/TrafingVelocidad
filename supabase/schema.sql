@@ -56,3 +56,32 @@ create policy "anon read  gps_points"
   on public.gps_points for select using (true);
 create policy "anon write gps_points"
   on public.gps_points for insert with check (true);
+
+-- ── Tabla: control_points ──────────────────────────────────
+-- Puntos de referencia para tramificación. El usuario los crea con
+-- clic en el mapa desde el módulo de Procesamiento.
+create table if not exists public.control_points (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  lat        double precision not null,
+  lng        double precision not null,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_control_points_created_at on public.control_points (created_at desc);
+
+alter table public.control_points enable row level security;
+
+drop policy if exists "anon read control_points"   on public.control_points;
+drop policy if exists "anon write control_points"  on public.control_points;
+drop policy if exists "anon update control_points" on public.control_points;
+drop policy if exists "anon delete control_points" on public.control_points;
+
+create policy "anon read control_points"
+  on public.control_points for select using (true);
+create policy "anon write control_points"
+  on public.control_points for insert with check (true);
+create policy "anon update control_points"
+  on public.control_points for update using (true) with check (true);
+create policy "anon delete control_points"
+  on public.control_points for delete using (true);
