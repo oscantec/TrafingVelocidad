@@ -608,41 +608,47 @@
             </div>
           </div>
 
-          <!-- Reference Nodes (Puntos de Control) -->
+          <!-- Puntos de Control (Tramificación) -->
           <div class="viewer-panel-section">
             <div class="section-header">
               <div class="section-icon">🎯</div>
               <h2>Puntos de Control</h2>
             </div>
 
+            <!-- Cargar tramo guardado -->
             <div class="form-group">
-              <label class="form-label">Cargar guardados</label>
+              <label class="form-label">Cargar tramo guardado</label>
               <div class="track-selector">
-                <select id="savedPointsSelect">
+                <select id="savedTramoSelect">
                   <option value="">— Seleccionar —</option>
                 </select>
-                <button class="btn btn-sm btn-secondary" id="btnRefreshPoints" title="Refrescar">↻</button>
-              </div>
-              <div class="text-xs text-muted" style="margin-top:6px;line-height:1.5;">
-                Elige <strong>Todos</strong> para cargar toda la colección, o un punto específico.
+                <button class="btn btn-sm btn-secondary" id="btnRefreshTramos" title="Refrescar">↻</button>
               </div>
             </div>
 
+            <!-- Dibujar -->
             <div class="form-group">
               <button class="btn btn-primary w-full" id="btnDrawPoints">
                 ✏ Dibujar en mapa
               </button>
               <div id="drawingHint" class="hidden" style="margin-top:8px;padding:8px 10px;background:var(--accent-dim);color:var(--accent);border-radius:var(--r-md);font-size:var(--fs-xs);font-weight:600;line-height:1.5;">
-                Haz clic en el mapa para añadir un punto. Se guarda en la nube.
+                Haz clic en el mapa para añadir un punto. Al final pulsa <strong>Guardar tramo</strong>.
               </div>
             </div>
 
+            <!-- Lista actual + guardar/limpiar -->
             <div id="nodesInfo" class="hidden">
-              <div class="badge badge-success mb-md">
-                <span class="badge-dot"></span>
-                <span id="nodesCount">0</span> puntos cargados
+              <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;">
+                <span class="badge badge-accent">
+                  <span class="badge-dot"></span>
+                  <span id="nodesCount">0</span> puntos
+                </span>
+                <button class="btn btn-sm btn-secondary" id="btnClearNodes" title="Vaciar lista">🗑 Vaciar</button>
               </div>
               <div class="nodes-list" id="nodesList"></div>
+              <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:10px;">
+                💾 Guardar tramo
+              </button>
             </div>
           </div>
 
@@ -787,17 +793,17 @@
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>
 
-    <!-- Supabase control_points setup modal -->
+    <!-- Supabase setup modal (corridors + tramos + control_points) -->
     <div class="modal-overlay" id="cpSetupModal">
-      <div class="modal" style="max-width:640px;">
-        <div class="modal-title">⚙ Tabla de puntos de control pendiente</div>
+      <div class="modal" style="max-width:680px;">
+        <div class="modal-title">⚙ Tablas de tramificación pendientes</div>
         <div class="modal-body">
           <p style="margin-bottom:12px;">
-            Para guardar los puntos de control en la nube necesitas crear la tabla
-            <code>control_points</code> en Supabase. Por seguridad, solo el dueño del
-            proyecto (tú) puede crear tablas.
+            Para guardar <strong>Corredores → Tramos → Puntos de control</strong> en la nube
+            necesitas crear las tablas en Supabase. Solo el dueño del proyecto puede crear tablas;
+            desde la app no es posible. Ejecútalo una vez:
           </p>
-          <pre id="cpSetupSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
+          <pre id="cpSetupSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
           <div class="btn-group" style="margin-top:12px;">
             <button class="btn btn-sm btn-primary" id="cpSetupCopy">📋 Copiar SQL</button>
             <a class="btn btn-sm btn-secondary"
@@ -810,6 +816,36 @@
         <div class="modal-actions">
           <button class="btn btn-secondary" id="cpSetupClose">Cerrar</button>
           <button class="btn btn-primary" id="cpSetupRetry">Reintentar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save tramo modal -->
+    <div class="modal-overlay" id="saveTramoModal">
+      <div class="modal" style="max-width:460px;">
+        <div class="modal-title">Guardar tramo</div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Corredor</label>
+            <select id="stCorridor" class="form-input">
+              <option value="__new__">✚ Nuevo corredor…</option>
+            </select>
+            <input type="text" id="stCorridorNew" class="form-input"
+                   placeholder="Nombre del nuevo corredor"
+                   style="margin-top:6px;" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nombre del tramo</label>
+            <input type="text" id="stTramoName" class="form-input"
+                   placeholder="Ej: Caracas — Norte" autocomplete="off">
+          </div>
+          <div class="text-xs text-muted">
+            Se guardarán <strong id="stCount">0</strong> puntos en la nube.
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="stCancel">Cancelar</button>
+          <button class="btn btn-primary" id="stSave">Guardar</button>
         </div>
       </div>
     </div>

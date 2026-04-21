@@ -57,31 +57,52 @@ create policy "anon read  gps_points"
 create policy "anon write gps_points"
   on public.gps_points for insert with check (true);
 
--- ── Tabla: control_points ──────────────────────────────────
--- Puntos de referencia para tramificación. El usuario los crea con
--- clic en el mapa desde el módulo de Procesamiento.
-create table if not exists public.control_points (
+-- ══════════════════════════════════════════════════════════
+--  Tramificación — Corredor → Tramo → Puntos de control
+-- ══════════════════════════════════════════════════════════
+
+-- 1) Corredor (ej. "Avenida Caracas")
+create table if not exists public.corridors (
   id         uuid primary key default gen_random_uuid(),
-  name       text not null,
-  lat        double precision not null,
-  lng        double precision not null,
+  name       text not null unique,
   created_at timestamptz default now()
 );
 
-create index if not exists idx_control_points_created_at on public.control_points (created_at desc);
+-- 2) Tramo (ej. "Caracas — Norte") pertenece a un corredor
+create table if not exists public.tramos (
+  id           uuid primary key default gen_random_uuid(),
+  corridor_id  uuid not null references public.corridors(id) on delete cascade,
+  name         text not null,
+  created_at   timestamptz default now(),
+  unique (corridor_id, name)
+);
 
+create index if not exists idx_tramos_corridor on public.tramos (corridor_id);
+
+-- 3) Puntos de control, ordenados dentro de un tramo
+create table if not exists public.control_points (
+  id         uuid primary key default gen_random_uuid(),
+  tramo_id   uuid not null references public.tramos(id) on delete cascade,
+  name       text not null,
+  lat        double precision not null,
+  lng        double precision not null,
+  seq        integer default 0,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_control_points_tramo on public.control_points (tramo_id, seq);
+
+alter table public.corridors      enable row level security;
+alter table public.tramos         enable row level security;
 alter table public.control_points enable row level security;
 
-drop policy if exists "anon read control_points"   on public.control_points;
-drop policy if exists "anon write control_points"  on public.control_points;
-drop policy if exists "anon update control_points" on public.control_points;
-drop policy if exists "anon delete control_points" on public.control_points;
+drop policy if exists "anon all corridors"      on public.corridors;
+drop policy if exists "anon all tramos"         on public.tramos;
+drop policy if exists "anon all control_points" on public.control_points;
 
-create policy "anon read control_points"
-  on public.control_points for select using (true);
-create policy "anon write control_points"
-  on public.control_points for insert with check (true);
-create policy "anon update control_points"
-  on public.control_points for update using (true) with check (true);
-create policy "anon delete control_points"
-  on public.control_points for delete using (true);
+create policy "anon all corridors"
+  on public.corridors for all using (true) with check (true);
+create policy "anon all tramos"
+  on public.tramos for all using (true) with check (true);
+create policy "anon all control_points"
+  on public.control_points for all using (true) with check (true);

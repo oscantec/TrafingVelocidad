@@ -11,7 +11,8 @@ import {
 } from '../lib/geo.js';
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
-         listControlPoints, saveControlPoint, deleteControlPoint } from '../lib/supabase.js';
+         listTramos, listCorridors, listControlPointsByTramo,
+         saveTramoComplete, deleteTramo } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -39,15 +40,24 @@ const el = {
   btnLoadUrl: $('btnLoadUrl'),
   trackPasteInput: $('trackPasteInput'),
   btnLoadPaste: $('btnLoadPaste'),
-  savedPointsSelect: $('savedPointsSelect'),
-  btnRefreshPoints:  $('btnRefreshPoints'),
+  savedTramoSelect:  $('savedTramoSelect'),
+  btnRefreshTramos:  $('btnRefreshTramos'),
   btnDrawPoints:     $('btnDrawPoints'),
+  btnSaveTramo:      $('btnSaveTramo'),
+  btnClearNodes:     $('btnClearNodes'),
   drawingHint:       $('drawingHint'),
   cpSetupModal:      $('cpSetupModal'),
   cpSetupSql:        $('cpSetupSql'),
   cpSetupCopy:       $('cpSetupCopy'),
   cpSetupClose:      $('cpSetupClose'),
   cpSetupRetry:      $('cpSetupRetry'),
+  saveTramoModal:    $('saveTramoModal'),
+  stCorridor:        $('stCorridor'),
+  stCorridorNew:     $('stCorridorNew'),
+  stTramoName:       $('stTramoName'),
+  stCount:           $('stCount'),
+  stSave:            $('stSave'),
+  stCancel:          $('stCancel'),
   thresholdInput: $('thresholdInput'),
   btnProcess: $('btnProcess'),
   processBadge: $('processBadge'),
@@ -83,7 +93,7 @@ async function init() {
   bindEvents();
   loadTrackList();
   initPlayback(map);
-  refreshSavedPoints();
+  refreshTramos();
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -123,17 +133,19 @@ function bindEvents() {
   el.btnLoadPaste.addEventListener('click', handleTrackPasteImport);
 
   // Nodes from file
-  // Control-point events
+  // Tramificación
   el.btnDrawPoints.addEventListener('click', toggleDrawingMode);
-  el.btnRefreshPoints.addEventListener('click', refreshSavedPoints);
-  el.savedPointsSelect.addEventListener('change', handleSavedPointSelect);
+  el.btnRefreshTramos.addEventListener('click', refreshTramos);
+  el.savedTramoSelect.addEventListener('change', handleTramoSelect);
+  el.btnSaveTramo.addEventListener('click', openSaveTramoModal);
+  el.btnClearNodes.addEventListener('click', clearReferenceNodes);
   map.on('click', handleMapClickForDrawing);
 
-  // Control-point setup modal
-  el.cpSetupSql.textContent = CONTROL_POINTS_SETUP_SQL;
+  // Setup modal (tables missing)
+  el.cpSetupSql.textContent = TRAMIFICATION_SETUP_SQL;
   el.cpSetupCopy.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(CONTROL_POINTS_SETUP_SQL);
+      await navigator.clipboard.writeText(TRAMIFICATION_SETUP_SQL);
       el.cpSetupCopy.textContent = '✓ Copiado';
       setTimeout(() => { el.cpSetupCopy.textContent = '📋 Copiar SQL'; }, 1600);
     } catch {}
@@ -141,7 +153,19 @@ function bindEvents() {
   el.cpSetupClose.addEventListener('click', () => el.cpSetupModal.classList.remove('active'));
   el.cpSetupRetry.addEventListener('click', async () => {
     el.cpSetupModal.classList.remove('active');
-    await refreshSavedPoints();
+    await refreshTramos();
+  });
+
+  // Save tramo modal
+  el.stSave.addEventListener('click', handleSaveTramoSubmit);
+  el.stCancel.addEventListener('click', () => el.saveTramoModal.classList.remove('active'));
+  el.stCorridor.addEventListener('change', () => {
+    const showNew = el.stCorridor.value === '__new__';
+    el.stCorridorNew.style.display = showNew ? 'block' : 'none';
+    if (showNew) el.stCorridorNew.focus();
+  });
+  el.saveTramoModal.addEventListener('click', (e) => {
+    if (e.target === el.saveTramoModal) el.saveTramoModal.classList.remove('active');
   });
 
   // Process
@@ -304,89 +328,105 @@ function loadTrackData(points) {
   updateProcessButton();
 }
 
-// ── Control Points (tramificación) ───────────────────────────
+// ── Tramificación: Corredor → Tramo → Puntos ─────────────────
 let drawingMode = false;
-let savedPointsCache = [];  // last fetched cloud list
+let tramosCache = [];      // [{id, name, corridor_id, corridors:{id, name}}]
+let corridorsCache = [];   // [{id, name}]
 
-const CONTROL_POINTS_SETUP_SQL = `create table if not exists public.control_points (
+const TRAMIFICATION_SETUP_SQL = `create table if not exists public.corridors (
   id         uuid primary key default gen_random_uuid(),
-  name       text not null,
-  lat        double precision not null,
-  lng        double precision not null,
+  name       text not null unique,
   created_at timestamptz default now()
 );
 
+create table if not exists public.tramos (
+  id          uuid primary key default gen_random_uuid(),
+  corridor_id uuid not null references public.corridors(id) on delete cascade,
+  name        text not null,
+  created_at  timestamptz default now(),
+  unique (corridor_id, name)
+);
+
+create table if not exists public.control_points (
+  id         uuid primary key default gen_random_uuid(),
+  tramo_id   uuid not null references public.tramos(id) on delete cascade,
+  name       text not null,
+  lat        double precision not null,
+  lng        double precision not null,
+  seq        integer default 0,
+  created_at timestamptz default now()
+);
+
+alter table public.corridors      enable row level security;
+alter table public.tramos         enable row level security;
 alter table public.control_points enable row level security;
 
-drop policy if exists "anon read control_points"   on public.control_points;
-drop policy if exists "anon write control_points"  on public.control_points;
-drop policy if exists "anon update control_points" on public.control_points;
-drop policy if exists "anon delete control_points" on public.control_points;
+drop policy if exists "anon all corridors"      on public.corridors;
+drop policy if exists "anon all tramos"         on public.tramos;
+drop policy if exists "anon all control_points" on public.control_points;
 
-create policy "anon read control_points"   on public.control_points for select using (true);
-create policy "anon write control_points"  on public.control_points for insert with check (true);
-create policy "anon update control_points" on public.control_points for update using (true) with check (true);
-create policy "anon delete control_points" on public.control_points for delete using (true);`;
+create policy "anon all corridors"      on public.corridors      for all using (true) with check (true);
+create policy "anon all tramos"         on public.tramos         for all using (true) with check (true);
+create policy "anon all control_points" on public.control_points for all using (true) with check (true);`;
 
-async function refreshSavedPoints() {
-  const res = await listControlPoints();
-  if (!res.ok) {
-    if (res.missing) { el.cpSetupModal.classList.add('active'); return; }
-    showToast(`Error leyendo nube: ${res.error}`, 'error');
+async function refreshTramos() {
+  const [tRes, cRes] = await Promise.all([listTramos(), listCorridors()]);
+  if (!tRes.ok) {
+    if (tRes.missing) { el.cpSetupModal.classList.add('active'); return; }
+    showToast(`Error leyendo tramos: ${tRes.error}`, 'error');
     return;
   }
-  savedPointsCache = res.points;
-  renderSavedPointsDropdown();
+  tramosCache = tRes.tramos;
+  corridorsCache = cRes.ok ? cRes.corridors : [];
+  renderTramoDropdown();
 }
 
-function renderSavedPointsDropdown() {
-  const sel = el.savedPointsSelect;
+function renderTramoDropdown() {
+  const sel = el.savedTramoSelect;
   sel.innerHTML = '<option value="">— Seleccionar —</option>';
-  if (savedPointsCache.length === 0) {
-    sel.innerHTML += '<option disabled>(no hay puntos guardados todavía)</option>';
+  if (tramosCache.length === 0) {
+    sel.innerHTML += '<option disabled>(sin tramos guardados)</option>';
     return;
   }
-  const allOpt = document.createElement('option');
-  allOpt.value = '__ALL__';
-  allOpt.textContent = `Todos (${savedPointsCache.length})`;
-  sel.appendChild(allOpt);
-
-  const sep = document.createElement('option');
-  sep.disabled = true;
-  sep.textContent = '──────────';
-  sel.appendChild(sep);
-
-  for (const p of savedPointsCache) {
-    const opt = document.createElement('option');
-    opt.value = p.id;
-    opt.textContent = `${p.name} · ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`;
-    sel.appendChild(opt);
+  // Group tramos by corridor name
+  const byCorridor = new Map();
+  for (const t of tramosCache) {
+    const cname = t.corridors?.name || 'Sin corredor';
+    if (!byCorridor.has(cname)) byCorridor.set(cname, []);
+    byCorridor.get(cname).push(t);
+  }
+  for (const [cname, list] of [...byCorridor.entries()].sort()) {
+    const group = document.createElement('optgroup');
+    group.label = cname;
+    for (const t of list) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
   }
 }
 
-function handleSavedPointSelect() {
-  const v = el.savedPointsSelect.value;
-  if (!v) return;
-
-  if (v === '__ALL__') {
-    const nodes = savedPointsCache.map((p) => ({ id: p.id, name: p.name, lat: +p.lat, lng: +p.lng }));
-    referenceNodes = nodes;
-    displayNodes(nodes);
-    drawNodeMarkers(nodes);
-    updateProcessButton();
-    showToast(`${nodes.length} puntos cargados de la nube`, 'success');
-  } else {
-    const p = savedPointsCache.find((x) => x.id === v);
-    if (!p) return;
-    const exists = referenceNodes.some((n) => n.id === p.id);
-    if (exists) { showToast('Ese punto ya está cargado', 'warning'); return; }
-    referenceNodes.push({ id: p.id, name: p.name, lat: +p.lat, lng: +p.lng });
-    displayNodes(referenceNodes);
-    drawNodeMarkers(referenceNodes);
-    updateProcessButton();
-    showToast(`"${p.name}" añadido`, 'success');
+async function handleTramoSelect() {
+  const tramoId = el.savedTramoSelect.value;
+  if (!tramoId) return;
+  const res = await listControlPointsByTramo(tramoId);
+  if (!res.ok) {
+    showToast(`Error: ${res.error}`, 'error');
+    return;
   }
-  el.savedPointsSelect.value = '';
+  const nodes = (res.points || []).map((p) => ({
+    id: p.id, name: p.name, lat: +p.lat, lng: +p.lng, cloud: true, tramoId,
+  }));
+  referenceNodes = nodes;
+  displayNodes(nodes);
+  drawNodeMarkers(nodes);
+  updateProcessButton();
+  const tramo = tramosCache.find((t) => t.id === tramoId);
+  const label = tramo ? `${tramo.corridors?.name || ''} / ${tramo.name}` : 'tramo';
+  showToast(`Cargados ${nodes.length} puntos de "${label}"`, 'success');
+  el.savedTramoSelect.value = '';
 }
 
 function toggleDrawingMode() {
@@ -414,7 +454,7 @@ function openNodeNamePopup(latlng, defaultName) {
       <input id="np-name" type="text" value="${defaultName}" autocomplete="off"
              style="width:100%;padding:6px 8px;border:1px solid #E4E8EE;border-radius:6px;font-size:13px;margin-bottom:6px;box-sizing:border-box;">
       <div style="display:flex;gap:6px;">
-        <button id="np-save" style="flex:1;padding:6px 10px;background:#F05A1A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Guardar</button>
+        <button id="np-save" style="flex:1;padding:6px 10px;background:#F05A1A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Añadir</button>
         <button id="np-cancel" style="padding:6px 10px;background:#F8FAFC;color:#475569;border:1px solid #E4E8EE;border-radius:6px;cursor:pointer;">Cancelar</button>
       </div>
     </div>`;
@@ -428,31 +468,17 @@ function openNodeNamePopup(latlng, defaultName) {
     const cancel = document.getElementById('np-cancel');
     if (input) { input.focus(); input.select(); }
 
-    const commit = async () => {
+    const commit = () => {
       const name = (input.value || '').trim() || defaultName;
       map.closePopup(popup);
-
-      // optimistic add to the local list with a temp id
-      const tempNode = { id: 'temp-' + Date.now(), name, lat: latlng.lat, lng: latlng.lng };
-      referenceNodes.push(tempNode);
+      referenceNodes.push({
+        id: 'local-' + Date.now(),
+        name, lat: latlng.lat, lng: latlng.lng, cloud: false,
+      });
       displayNodes(referenceNodes);
       drawNodeMarkers(referenceNodes);
       updateProcessButton();
-
-      const res = await saveControlPoint({ name, lat: latlng.lat, lng: latlng.lng });
-      if (res.success) {
-        tempNode.id = res.data.id;       // replace temp id with cloud id
-        displayNodes(referenceNodes);
-        savedPointsCache.unshift(res.data);
-        renderSavedPointsDropdown();
-        showToast(`"${name}" guardado en nube`, 'success');
-      } else if (res.missing) {
-        el.cpSetupModal.classList.add('active');
-      } else {
-        showToast(`Guardado local; error en nube: ${res.error}`, 'warning', 5500);
-      }
     };
-
     if (save)   save.onclick = commit;
     if (cancel) cancel.onclick = () => map.closePopup(popup);
     if (input)  input.addEventListener('keydown', (ev) => {
@@ -467,20 +493,24 @@ function displayNodes(nodes) {
   el.nodesInfo.classList.remove('hidden');
   el.nodesCount.textContent = nodes.length;
 
-  el.nodesList.innerHTML = nodes.map((n) => `
-    <div class="node-item" data-id="${n.id}">
-      <div style="flex:1;min-width:0;">
-        <span class="node-name">${escapeHtml(n.name)}</span>
-        <span class="node-coords">${Number(n.lat).toFixed(6)}, ${Number(n.lng).toFixed(6)}</span>
-      </div>
-      <button class="btn btn-sm btn-danger" data-remove title="Quitar">✕</button>
-    </div>
-  `).join('');
+  el.nodesList.innerHTML = nodes.map((n, i) => {
+    const mark = n.cloud
+      ? '<span class="badge badge-success" style="padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">☁</span>'
+      : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">local</span>';
+    return `
+      <div class="node-item" data-id="${n.id}">
+        <div style="flex:1;min-width:0;">
+          <span class="node-name">${i + 1}. ${escapeHtml(n.name)} ${mark}</span>
+          <span class="node-coords">${Number(n.lat).toFixed(6)}, ${Number(n.lng).toFixed(6)}</span>
+        </div>
+        <button class="btn btn-sm btn-danger" data-remove title="Quitar">✕</button>
+      </div>`;
+  }).join('');
 
   el.nodesList.querySelectorAll('[data-remove]').forEach((btn) => {
     btn.addEventListener('click', (ev) => {
       const row = ev.currentTarget.closest('[data-id]');
-      if (row) removeNodeById(row.dataset.id);
+      if (row) removeNodeLocal(row.dataset.id);
     });
   });
 }
@@ -489,25 +519,106 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
-async function removeNodeById(id) {
+function removeNodeLocal(id) {
   const idx = referenceNodes.findIndex((n) => n.id === id);
   if (idx === -1) return;
-  const node = referenceNodes[idx];
   referenceNodes.splice(idx, 1);
   displayNodes(referenceNodes);
   drawNodeMarkers(referenceNodes);
   updateProcessButton();
+}
 
-  // Only attempt cloud delete for points that were actually saved
-  if (!String(id).startsWith('temp-') && !id.includes(':')) {
-    const res = await deleteControlPoint(id);
-    if (res.success) {
-      savedPointsCache = savedPointsCache.filter((p) => p.id !== id);
-      renderSavedPointsDropdown();
-      showToast(`"${node.name}" borrado de la nube`, 'success');
-    } else {
-      showToast(`Borrado local; error en nube: ${res.error}`, 'warning');
+function clearReferenceNodes() {
+  if (referenceNodes.length === 0) return;
+  if (!confirm(`¿Vaciar los ${referenceNodes.length} puntos actuales? Esto no borra lo guardado en nube.`)) return;
+  referenceNodes = [];
+  displayNodes(referenceNodes);
+  drawNodeMarkers(referenceNodes);
+  updateProcessButton();
+}
+
+// ── Save Tramo modal ─────────────────────────────────────────
+function openSaveTramoModal() {
+  if (referenceNodes.length === 0) {
+    showToast('Agrega al menos un punto antes de guardar', 'warning');
+    return;
+  }
+  // Populate corridors dropdown
+  el.stCorridor.innerHTML = '';
+  const newOpt = document.createElement('option');
+  newOpt.value = '__new__';
+  newOpt.textContent = '✚ Nuevo corredor…';
+  el.stCorridor.appendChild(newOpt);
+
+  if (corridorsCache.length) {
+    const sep = document.createElement('option');
+    sep.disabled = true; sep.textContent = '──────────';
+    el.stCorridor.appendChild(sep);
+    for (const c of corridorsCache) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      el.stCorridor.appendChild(opt);
     }
+    el.stCorridor.value = corridorsCache[0].id;
+    el.stCorridorNew.style.display = 'none';
+  } else {
+    el.stCorridor.value = '__new__';
+    el.stCorridorNew.style.display = 'block';
+  }
+
+  el.stCorridorNew.value = '';
+  el.stTramoName.value = '';
+  el.stCount.textContent = referenceNodes.length;
+  el.saveTramoModal.classList.add('active');
+  setTimeout(() => {
+    if (el.stCorridor.value === '__new__') el.stCorridorNew.focus();
+    else el.stTramoName.focus();
+  }, 50);
+}
+
+async function handleSaveTramoSubmit() {
+  const isNewCorridor = el.stCorridor.value === '__new__';
+  const corridorId = isNewCorridor ? null : el.stCorridor.value;
+  const corridorName = isNewCorridor ? el.stCorridorNew.value.trim() : null;
+  const tramoName = el.stTramoName.value.trim();
+
+  if (isNewCorridor && !corridorName) {
+    showToast('Ingresa el nombre del corredor', 'warning');
+    el.stCorridorNew.focus();
+    return;
+  }
+  if (!tramoName) {
+    showToast('Ingresa el nombre del tramo', 'warning');
+    el.stTramoName.focus();
+    return;
+  }
+
+  el.stSave.disabled = true;
+  el.stSave.textContent = 'Guardando…';
+
+  const res = await saveTramoComplete({
+    corridorId,
+    corridorName,
+    tramoName,
+    points: referenceNodes.map((n) => ({ name: n.name, lat: +n.lat, lng: +n.lng })),
+  });
+
+  el.stSave.disabled = false;
+  el.stSave.textContent = 'Guardar';
+
+  if (res.success) {
+    el.saveTramoModal.classList.remove('active');
+    showToast(`Tramo "${tramoName}" guardado (${referenceNodes.length} puntos)`, 'success');
+    // Mark local nodes as cloud-backed now
+    referenceNodes = referenceNodes.map((n) => ({ ...n, cloud: true, tramoId: res.tramoId }));
+    displayNodes(referenceNodes);
+    await refreshTramos();
+  } else if (res.missing) {
+    el.saveTramoModal.classList.remove('active');
+    el.cpSetupModal.classList.add('active');
+  } else {
+    showToast(`Error: ${res.error}`, 'error', 6000);
   }
 }
 
