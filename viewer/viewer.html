@@ -88,7 +88,7 @@
     /* Stat cards row */
     .pb-stats {
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
 
@@ -157,11 +157,9 @@
       border-radius: 99px;
       transition: width 0.3s var(--ease-out);
     }
-    .pb-stat[data-metric="time"]      .pb-stat-bar-fill { background: #64748B; }
-    .pb-stat[data-metric="distance"]  .pb-stat-bar-fill { background: #475569; }
-    .pb-stat[data-metric="speed"]     .pb-stat-bar-fill { background: var(--accent); }
-    .pb-stat[data-metric="elevation"] .pb-stat-bar-fill { background: #22C55E; }
-    .pb-stat[data-metric="grade"]     .pb-stat-bar-fill { background: #EAB308; }
+    .pb-stat[data-metric="time"]     .pb-stat-bar-fill { background: #64748B; }
+    .pb-stat[data-metric="distance"] .pb-stat-bar-fill { background: #475569; }
+    .pb-stat[data-metric="speed"]    .pb-stat-bar-fill { background: var(--accent); }
 
     /* Chart */
     .pb-chart {
@@ -227,7 +225,7 @@
       .viewer-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
       .viewer-panel { max-height: 38vh; border-right: none; border-bottom: 1px solid var(--border); }
       .playback-panel { padding: 8px 10px 10px; gap: 8px; }
-      .pb-stats { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+      .pb-stats { grid-template-columns: repeat(3, 1fr); gap: 5px; }
       .pb-stat { padding: 6px 7px 5px; }
       .pb-stat-label { font-size: 8px; letter-spacing: 0.04em; }
       .pb-stat-value { font-size: 13px; }
@@ -236,8 +234,8 @@
       .pb-btn { padding: 5px 9px; font-size: 10px; }
     }
     @media (max-width: 420px) {
-      .pb-stats { grid-template-columns: repeat(3, 1fr); }
       .pb-point-info { display: none; }
+      .pb-btn { padding: 4px 7px; font-size: 10px; }
     }
   </style>
   <style>
@@ -745,25 +743,6 @@
               <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
             </div>
 
-            <div class="pb-stat" data-metric="elevation">
-              <div class="pb-stat-label">Elevación</div>
-              <div class="pb-stat-row">
-                <span class="pb-stat-value" data-value>0.0</span>
-                <span class="pb-stat-unit">m</span>
-                <span class="pb-stat-max"><span data-min>—</span>–<span data-max>—</span></span>
-              </div>
-              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
-            </div>
-
-            <div class="pb-stat" data-metric="grade">
-              <div class="pb-stat-label">Pendiente</div>
-              <div class="pb-stat-row">
-                <span class="pb-stat-value" data-value>0.0</span>
-                <span class="pb-stat-unit">%</span>
-                <span class="pb-stat-max"><span data-min>—</span>–<span data-max>—</span></span>
-              </div>
-              <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
-            </div>
           </div>
 
           <div class="pb-chart">

@@ -7,8 +7,9 @@
 import { haversineDistance } from '../lib/geo.js';
 
 const ACCENT = '#F05A1A';
-const BLUE = '#3B82F6';
-const GREEN = '#22C55E';
+const BLUE   = '#3B82F6';
+const GREEN  = '#22C55E';
+const RED    = '#DC2626';
 
 const $ = (id) => document.getElementById(id);
 
@@ -49,11 +50,9 @@ let state = {
 export function initPlayback(map) {
   state.map = map;
   s = {
-    time:      stat('time'),
-    distance:  stat('distance'),
-    speed:     stat('speed'),
-    elevation: stat('elevation'),
-    grade:     stat('grade'),
+    time:     stat('time'),
+    distance: stat('distance'),
+    speed:    stat('speed'),
   };
 
   el.btnPlay.addEventListener('click',  play);
@@ -79,13 +78,9 @@ export function loadPlaybackTrack(points) {
 
   state.meta = computeMeta(state.points);
 
-  s.time.max.textContent      = formatDuration(state.meta.totalMs / 1000);
-  s.distance.max.textContent  = state.meta.totalKm.toFixed(3);
-  s.speed.max.textContent     = state.meta.maxSpeed.toFixed(1);
-  s.elevation.min.textContent = state.meta.minEle.toFixed(0);
-  s.elevation.max.textContent = state.meta.maxEle.toFixed(0);
-  s.grade.min.textContent     = state.meta.minGrade.toFixed(1);
-  s.grade.max.textContent     = state.meta.maxGrade.toFixed(1);
+  s.time.max.textContent     = formatDuration(state.meta.totalMs / 1000);
+  s.distance.max.textContent = state.meta.totalKm.toFixed(3);
+  s.speed.max.textContent    = state.meta.maxSpeed.toFixed(1);
 
   el.totalLabel.textContent = state.points.length;
 
@@ -182,6 +177,52 @@ function makeDotIcon(color, size = 14, ring = 3) {
   });
 }
 
+function makeVehicleIcon() {
+  // Pulsing red dot with a subtle ring — 'vehículo' marker
+  return L.divIcon({
+    className: '',
+    html: `<div style="position:relative;width:22px;height:22px;">
+      <div style="
+        position:absolute;inset:3px;background:${RED};
+        border:3px solid #fff;border-radius:50%;
+        box-shadow:0 0 0 1px rgba(15,23,42,0.25), 0 2px 8px rgba(220,38,38,0.55);
+      "></div>
+      <div style="
+        position:absolute;inset:0;border-radius:50%;
+        background:${RED};opacity:0.3;
+        animation:pulse-ring 1.6s ease-out infinite;
+      "></div>
+    </div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+  });
+}
+
+function makeFinishFlagIcon() {
+  // SVG checkered flag — F1 finish line style
+  const svg = `
+    <svg width="28" height="32" viewBox="0 0 28 32" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="2" height="28" fill="#0F172A"/>
+      <g transform="translate(4,2)">
+        <rect x="0" y="0" width="22" height="14" fill="#FFFFFF" stroke="#0F172A" stroke-width="0.8"/>
+        <rect x="0"  y="0"  width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="11" y="0"  width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="5.5" y="3.5" width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="16.5" y="3.5" width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="0"  y="7"  width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="11" y="7"  width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="5.5" y="10.5" width="5.5" height="3.5" fill="#0F172A"/>
+        <rect x="16.5" y="10.5" width="5.5" height="3.5" fill="#0F172A"/>
+      </g>
+    </svg>`;
+  return L.divIcon({
+    className: '',
+    html: svg,
+    iconSize: [28, 32],
+    iconAnchor: [3, 30],  // pole base touches the point
+  });
+}
+
 function setupMapMarkers() {
   const first = state.points[0];
   const last  = state.points[state.points.length - 1];
@@ -192,9 +233,9 @@ function setupMapMarkers() {
 
   state.startMarker = L.marker([first.lat, first.lng], { icon: makeDotIcon(GREEN), zIndexOffset: 500 })
     .addTo(state.map).bindTooltip('Inicio');
-  state.endMarker = L.marker([last.lat, last.lng], { icon: makeDotIcon('#DC2626'), zIndexOffset: 500 })
-    .addTo(state.map).bindTooltip('Fin');
-  state.marker = L.marker([first.lat, first.lng], { icon: makeDotIcon(ACCENT, 16, 4), zIndexOffset: 1000 })
+  state.endMarker = L.marker([last.lat, last.lng], { icon: makeFinishFlagIcon(), zIndexOffset: 500 })
+    .addTo(state.map).bindTooltip('Meta');
+  state.marker = L.marker([first.lat, first.lng], { icon: makeVehicleIcon(), zIndexOffset: 1000 })
     .addTo(state.map);
 }
 
@@ -227,6 +268,13 @@ function rebuildChart() {
       maintainAspectRatio: false,
       animation: false,
       interaction: { mode: 'index', intersect: false },
+      onHover: (event, activeElements) => {
+        if (activeElements && activeElements.length) {
+          const idx = activeElements[0].index;
+          if (state.playing) pause();
+          if (idx !== state.idx) seek(idx);
+        }
+      },
       plugins: {
         legend: { position: 'top', align: 'end',
           labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, font: { size: 10 }, padding: 6 } },
@@ -247,6 +295,36 @@ function rebuildChart() {
     },
     plugins: [verticalLinePlugin()],
   });
+
+  // Touch scrubbing on mobile — Chart.js' onHover sometimes misses touchmove
+  el.chartCanvas.style.touchAction = 'none';
+  el.chartCanvas.addEventListener('touchmove',  handleTouchScrub, { passive: false });
+  el.chartCanvas.addEventListener('touchstart', handleTouchScrub, { passive: false });
+}
+
+function handleTouchScrub(ev) {
+  if (!state.chart || !state.points.length) return;
+  ev.preventDefault();
+  const touch = ev.touches[0];
+  if (!touch) return;
+  const rect = el.chartCanvas.getBoundingClientRect();
+  const xPx = touch.clientX - rect.left;
+  const t0 = state.points[0].timestamp;
+  const totalS = (state.points[state.points.length - 1].timestamp - t0) / 1000;
+  const xScale = state.chart.scales.x;
+  let sec = xScale.getValueForPixel(xPx);
+  if (sec == null || isNaN(sec)) return;
+  sec = Math.max(0, Math.min(totalS, sec));
+
+  // Binary search for the closest point by timestamp offset
+  let lo = 0, hi = state.points.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const ts = (state.points[mid].timestamp - t0) / 1000;
+    if (ts < sec) lo = mid + 1; else hi = mid;
+  }
+  if (state.playing) pause();
+  if (lo !== state.idx) seek(lo);
 }
 
 function verticalLinePlugin() {
@@ -334,14 +412,6 @@ function seek(i) {
   const kmh = m.speedsKmh[state.idx] ?? 0;
   setStat(s.speed, (kmh ?? 0).toFixed(1),
     m.maxSpeed > 0 ? (kmh || 0) / m.maxSpeed : 0);
-
-  const ele = Number.isFinite(p.altitude) ? p.altitude : m.minEle;
-  setStat(s.elevation, ele.toFixed(1),
-    (m.maxEle - m.minEle) > 0 ? (ele - m.minEle) / (m.maxEle - m.minEle) : 0);
-
-  const grade = m.gradesPct[state.idx] || 0;
-  setStat(s.grade, grade.toFixed(1),
-    (m.maxGrade - m.minGrade) > 0 ? (grade - m.minGrade) / (m.maxGrade - m.minGrade) : 0);
 
   if (state.chart) state.chart.update('none');
 }
