@@ -365,6 +365,21 @@ function handleTrackPasteImport() {
 function addRecorrido({ name, points, sourceUrl = '' }) {
   if (!points || !points.length) return;
   const startTs = points[0]?.timestamp || Date.now();
+
+  // Deduplicate: same source URL, OR same start timestamp and point count
+  // (a re-dragged file gets the same values).
+  const dup = recorridos.find((r) =>
+    (sourceUrl && r.sourceUrl && r.sourceUrl === sourceUrl) ||
+    (r.startTs === startTs && r.points.length === points.length)
+  );
+  if (dup) {
+    activeRecorridoId = dup.id;
+    renderRecorridosList();
+    loadTrackData(dup.points);
+    showToast('Ese recorrido ya estaba cargado; no se duplicó.', 'warning');
+    return;
+  }
+
   const rec = {
     id: `rec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name,
