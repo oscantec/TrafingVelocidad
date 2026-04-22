@@ -127,7 +127,6 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--r-xl);
-      padding: 36px 24px;
       text-align: center;
       box-shadow: var(--shadow-sm);
       transition: transform 220ms var(--ease), box-shadow 220ms var(--ease), border-color 220ms var(--ease);
@@ -136,20 +135,7 @@
       cursor: pointer;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-    }
-    .module-card .module-icon { margin-bottom: 0; }
-
-    .module-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--accent);
-      opacity: 0;
-      transition: opacity 200ms var(--ease);
+      align-items: stretch;
     }
 
     .module-card:hover {
@@ -157,34 +143,33 @@
       border-color: var(--accent);
       box-shadow: var(--shadow-lg);
     }
-
-    .module-card:hover::before { opacity: 1; }
     .module-card:active { transform: translateY(-1px); }
 
-    .module-icon {
-      width: 64px;
-      height: 64px;
-      border-radius: var(--r-lg);
-      background: var(--accent-soft);
-      color: var(--accent);
+    /* Orange banner on top of each card */
+    .module-hero {
+      background: var(--accent);
+      color: #fff;
+      padding: 36px 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 18px;
-      transition: background 200ms var(--ease), color 200ms var(--ease), transform 200ms var(--ease);
+      transition: filter 200ms var(--ease);
+    }
+    .module-card:hover .module-hero { filter: brightness(1.04); }
+
+    .module-hero svg {
+      width: 54px;
+      height: 54px;
+      stroke: #fff;
     }
 
-    .module-card:hover .module-icon {
-      background: var(--accent);
-      color: #fff;
-      transform: scale(1.05);
-    }
-
-    .module-card h2 {
+    .module-label {
+      padding: 22px 20px 26px;
       font-size: 20px;
-      font-weight: 700;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
       color: var(--text);
-      letter-spacing: -0.01em;
     }
 
     /* ── Footer ───────────────────────────────────────── */
@@ -228,9 +213,9 @@
         gap: 14px;
       }
 
-      .module-card { padding: 24px 20px; }
-      .module-icon { width: 54px; height: 54px; margin-bottom: 14px; }
-      .module-card h2 { font-size: 18px; }
+      .module-hero { padding: 28px 16px; }
+      .module-hero svg { width: 44px; height: 44px; }
+      .module-label { padding: 16px 16px 20px; font-size: 17px; }
     }
   </style>
 </head>
@@ -251,26 +236,26 @@
 
         <!-- Módulo 1: Captura -->
         <a href="capture/capture.html" class="module-card" id="module-capture">
-          <div class="module-icon">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="module-hero">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
               <circle cx="12" cy="10" r="3"/>
             </svg>
           </div>
-          <h2>Captura</h2>
+          <div class="module-label">Captura</div>
         </a>
 
         <!-- Módulo 2: Procesamiento -->
         <a href="viewer/viewer.html" class="module-card" id="module-viewer">
-          <div class="module-icon">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <div class="module-hero">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="20" x2="18" y2="10"/>
               <line x1="12" y1="20" x2="12" y2="4"/>
               <line x1="6"  y1="20" x2="6"  y2="14"/>
               <line x1="3"  y1="20" x2="21" y2="20"/>
             </svg>
           </div>
-          <h2>Procesamiento</h2>
+          <div class="module-label">Procesamiento</div>
         </a>
 
       </div>
