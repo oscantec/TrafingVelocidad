@@ -285,8 +285,15 @@ function rebuildChart() {
         },
       },
       scales: {
-        x: { type: 'linear', ticks: { font: { size: 10 }, maxTicksLimit: 6, callback: (v) => formatDurationShort(v) },
-          grid: { color: 'rgba(148,163,184,0.12)' } },
+        x: {
+          type: 'linear',
+          min: 0,
+          max: labels[labels.length - 1] ?? 0,
+          bounds: 'ticks',
+          offset: false,
+          ticks: { font: { size: 10 }, maxTicksLimit: 6, callback: (v) => formatDurationShort(v) },
+          grid: { color: 'rgba(148,163,184,0.12)' },
+        },
         y: { position: 'left', ticks: { color: BLUE, font: { size: 10 } },
              grid: { color: 'rgba(148,163,184,0.12)' }, beginAtZero: true },
       },
@@ -390,7 +397,11 @@ function seek(i) {
   const p = state.points[state.idx];
   if (!p) return;
 
-  if (state.marker) state.marker.setLatLng([p.lat, p.lng]);
+  if (state.marker) {
+    state.marker.setLatLng([p.lat, p.lng]);
+    // Keep the vehicle marker centred — the map moves, the marker stays put.
+    if (state.map) state.map.panTo([p.lat, p.lng], { animate: false });
+  }
 
   el.idxLabel.textContent = state.idx + 1;
   el.tsLabel.textContent = fmtDateTime(p.timestamp);
