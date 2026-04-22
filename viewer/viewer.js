@@ -8,7 +8,7 @@ import {
   haversineDistance, totalDistance, elapsedTime, averageSpeed,
   matchNodesToTrack, segmentTrack, segmentMetrics,
   formatDistance, formatDuration, formatSpeed, generateSegmentColors,
-  findNodeCrossings,
+  findNodeCrossings, directionLabel,
 } from '../lib/geo.js';
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
@@ -381,6 +381,7 @@ function addRecorrido({ name, points, sourceUrl = '' }) {
   activeRecorridoId = rec.id;
   renderRecorridosList();
   loadTrackData(points);
+  autoDetectIfEmpty();
 }
 
 function renderRecorridosList() {
@@ -429,6 +430,7 @@ function activateRecorrido(id) {
   activeRecorridoId = id;
   renderRecorridosList();
   loadTrackData(rec.points);
+  autoDetectIfEmpty();
 }
 
 function removeRecorrido(id) {
@@ -645,8 +647,10 @@ function openNodeNamePopup(latlng, defaultName) {
 }
 
 function displayNodes(nodes) {
-  // Reference nodes changed — subtramos dropdowns need to refresh too.
+  // Reference nodes changed — subtramos dropdowns need to refresh too,
+  // and the list is auto-populated when both recorrido and nodes exist.
   renderSubtramosTable();
+  autoDetectIfEmpty();
   if (nodes.length === 0) { el.nodesInfo.classList.add('hidden'); return; }
   el.nodesInfo.classList.remove('hidden');
   el.nodesCount.textContent = nodes.length;
@@ -1179,14 +1183,29 @@ function clearSubtramos() {
 
 // Populate `subtramos` from the nodes the active recorrido actually crosses,
 // in the order they appear. Useful to kick-start the list.
-function autoDetectSubtramos() {
-  if (!activeRecorridoId) { showToast('Selecciona un recorrido activo primero.', 'warning'); return; }
-  if (!referenceNodes.length) { showToast('Carga los puntos de control primero.', 'warning'); return; }
+// Derive "S - N" / "N - S" / … from the node positions. Returns '' if
+// either endpoint is the Inicio/Fin sentinel (no fixed coordinates).
+function sentidoForPair(startNodeId, endNodeId) {
+  if (startNodeId === START_NODE_ID || startNodeId === END_NODE_ID) return '';
+  if (endNodeId === START_NODE_ID   || endNodeId === END_NODE_ID)   return '';
+  const a = referenceNodes.find((n) => n.id === startNodeId);
+  const b = referenceNodes.find((n) => n.id === endNodeId);
+  return (a && b) ? directionLabel(a, b) : '';
+}
+
+function autoDetectSubtramos(opts = { silent: false }) {
+  if (!activeRecorridoId) {
+    if (!opts.silent) showToast('Selecciona un recorrido activo primero.', 'warning');
+    return;
+  }
+  if (!referenceNodes.length) {
+    if (!opts.silent) showToast('Carga los puntos de control primero.', 'warning');
+    return;
+  }
   const rec = recorridos.find((r) => r.id === activeRecorridoId);
   if (!rec) return;
 
   const threshold = parseFloat(el.thresholdInput.value) || 50;
-  // Build the ordered sequence of node crossings along the track.
   const events = [];
   for (const n of referenceNodes) {
     for (const c of findNodeCrossings(n, rec.points, threshold)) {
@@ -1196,23 +1215,31 @@ function autoDetectSubtramos() {
   events.sort((a, b) => a.trackIndex - b.trackIndex);
 
   if (!events.length) {
-    showToast('Ningún nodo dentro del umbral. Aumenta el umbral y reintenta.', 'warning');
+    if (!opts.silent) showToast('Ningún nodo dentro del umbral. Aumenta el umbral y reintenta.', 'warning');
     return;
   }
 
   const fresh = [];
-  // Inicio → primer cruce
   fresh.push({ id: newSubtramoId(), active: true, startNodeId: START_NODE_ID, endNodeId: events[0].nodeId, sentido: '' });
-  // Entre cruces consecutivos
   for (let i = 1; i < events.length; i++) {
-    fresh.push({ id: newSubtramoId(), active: true, startNodeId: events[i - 1].nodeId, endNodeId: events[i].nodeId, sentido: '' });
+    const s = events[i - 1].nodeId;
+    const e = events[i].nodeId;
+    fresh.push({ id: newSubtramoId(), active: true, startNodeId: s, endNodeId: e, sentido: sentidoForPair(s, e) });
   }
-  // Último cruce → Fin
   fresh.push({ id: newSubtramoId(), active: true, startNodeId: events[events.length - 1].nodeId, endNodeId: END_NODE_ID, sentido: '' });
 
   subtramos = fresh;
   renderSubtramosTable();
-  showToast(`Detectados ${fresh.length} subtramos. Ajusta/desactiva los que no necesites.`, 'success');
+  if (!opts.silent) showToast(`Detectados ${fresh.length} subtramos. Ajusta/desactiva los que no necesites.`, 'success');
+}
+
+// Fill the list once the prerequisites are there and the user hasn't
+// already started editing. Also called after changes so new nodes
+// get picked up automatically.
+function autoDetectIfEmpty() {
+  if (subtramos.length) return;
+  if (!activeRecorridoId || !referenceNodes.length) return;
+  autoDetectSubtramos({ silent: true });
 }
 
 function nodeOptionsHtml(selectedId) {
@@ -1243,10 +1270,10 @@ function renderSubtramosTable() {
     <tr data-id="${st.id}" style="${rowStyle}">
       <td style="text-align:center;"><input type="checkbox" data-active ${st.active ? 'checked' : ''}></td>
       <td>${i + 1}</td>
-      <td><select data-start class="form-input" style="padding:4px 6px;font-size:12px;">${nodeOptionsHtml(st.startNodeId)}</select></td>
-      <td><select data-end class="form-input" style="padding:4px 6px;font-size:12px;">${nodeOptionsHtml(st.endNodeId)}</select></td>
-      <td><input type="text" class="form-input" data-sentido value="${escapeHtml(st.sentido || '')}" placeholder="S - N" style="padding:4px 6px;font-size:12px;min-width:72px;"></td>
-      <td><button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button></td>
+      <td><select data-start>${nodeOptionsHtml(st.startNodeId)}</select></td>
+      <td><select data-end>${nodeOptionsHtml(st.endNodeId)}</select></td>
+      <td><input type="text" data-sentido value="${escapeHtml(st.sentido || '')}" placeholder="S - N"></td>
+      <td><button class="row-remove" data-remove title="Quitar">Quitar</button></td>
     </tr>`;
   }).join('');
 
@@ -1334,6 +1361,25 @@ function subtramoRowsForRecorrido(rec, threshold) {
   return out;
 }
 
+const EXCEL_HEADERS = [
+  'DÍA', 'FECHA', 'PERIODO', 'LINK', 'CORREDOR', 'TRAMO',
+  'CALZADA', 'TIPO DE VEHICULO', 'RECORRIDO', 'SENTIDO',
+  'HORA DE INICIO', 'HORA LLEGADA', 'DISTANCIA', 'TIEMPO HORA', 'VELOCIDAD',
+];
+const EXCEL_COL_WIDTHS = [10, 30, 10, 52, 18, 24, 12, 16, 11, 11, 14, 14, 11, 13, 11];
+
+// Sanitize a corridor name into a filename-safe slug (upper case, underscores).
+function corredorSlug(name) {
+  const base = (name || '').normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const up = base.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return up || 'CORREDOR';
+}
+
+function upperOrBlank(v) {
+  if (v == null || v === '') return '';
+  return String(v).toUpperCase();
+}
+
 function exportExcel() {
   if (typeof XLSX === 'undefined') {
     showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
@@ -1355,22 +1401,23 @@ function exportExcel() {
     const consecutivo = ri + 1;
     const hits = subtramoRowsForRecorrido(rec, threshold);
     for (const h of hits) {
-      rows.push({
-        'DÍA':            diaClasificacion(rec.startTs),
-        'FECHA':          fechaLargaEs(rec.startTs),
-        'PERIODO':        study.periodo,
-        'LINK':           rec.sourceUrl || '',
-        'CORREDOR':       study.corredor,
-        'TRAMO':          `${resolveNodeName(h.subtramo.startNodeId)} - ${resolveNodeName(h.subtramo.endNodeId)}`,
-        'CALZADA':        study.calzada,
-        'RECORRIDO':      consecutivo,
-        'SENTIDO':        h.subtramo.sentido || '',
-        'HORA DE INICIO': formatClock(h.firstPointTime),
-        'HORA LLEGADA':   formatClock(h.lastPointTime),
-        'DISTANCIA':      +(h.distance / 1000).toFixed(4),
-        'TIEMPO HORA':    +(h.time / 3600).toFixed(4),
-        'VELOCIDAD':      +Number(h.avgSpeed || 0).toFixed(2),
-      });
+      rows.push([
+        upperOrBlank(diaClasificacion(rec.startTs)),
+        upperOrBlank(fechaLargaEs(rec.startTs)),
+        upperOrBlank(study.periodo),
+        rec.sourceUrl || '',
+        upperOrBlank(study.corredor),
+        upperOrBlank(`${resolveNodeName(h.subtramo.startNodeId)} - ${resolveNodeName(h.subtramo.endNodeId)}`),
+        upperOrBlank(study.calzada),
+        upperOrBlank(study.tipo),
+        consecutivo,
+        upperOrBlank(h.subtramo.sentido || ''),
+        formatClock(h.firstPointTime),
+        formatClock(h.lastPointTime),
+        +(h.distance / 1000).toFixed(4),
+        +(h.time / 3600).toFixed(4),
+        +Number(h.avgSpeed || 0).toFixed(2),
+      ]);
     }
   });
 
@@ -1379,16 +1426,56 @@ function exportExcel() {
     return;
   }
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [
-    { wch: 10 }, { wch: 28 }, { wch: 10 }, { wch: 40 }, { wch: 16 },
-    { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
-    { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 10 },
-  ];
+  // Sheet name = TIPICO / ATIPICO based on first recorrido's weekday
+  const sheetName = diaClasificacion(recorridos[0].startTs) || 'RECORRIDOS';
+
+  // Build sheet and apply styles
+  const aoa = [EXCEL_HEADERS, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = EXCEL_COL_WIDTHS.map((w) => ({ wch: w }));
+
+  const thinBorder = { style: 'thin', color: { rgb: 'CCCCCC' } };
+  const borderAll = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+
+  const headerStyle = {
+    font: { name: 'Calibri', bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+    fill: { patternType: 'solid', fgColor: { rgb: '1F3864' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    border: borderAll,
+  };
+  const zebraWhite = {
+    font: { name: 'Calibri', sz: 11, color: { rgb: '1F2937' } },
+    fill: { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } },
+    alignment: { vertical: 'center', wrapText: false },
+    border: borderAll,
+  };
+  const zebraGray = {
+    font: { name: 'Calibri', sz: 11, color: { rgb: '1F2937' } },
+    fill: { patternType: 'solid', fgColor: { rgb: 'F2F2F2' } },
+    alignment: { vertical: 'center', wrapText: false },
+    border: borderAll,
+  };
+
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for (let R = range.s.r; R <= range.e.r; R++) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+      if (R === 0) ws[addr].s = headerStyle;
+      else ws[addr].s = (R % 2 === 1) ? zebraWhite : zebraGray;
+    }
+  }
+
+  ws['!rows'] = [{ hpt: 28 }]; // header row a bit taller
+  ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  ws['!autofilter'] = { ref: ws['!ref'] };
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Recorridos');
-  const stamp = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `trafingvelocidad_${stamp}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const stamp = new Date(recorridos[0].startTs || Date.now()).toISOString().slice(0, 10);
+  const filename = `VEL_TRAFING_${corredorSlug(study.corredor)}_${stamp}.xlsx`;
+  XLSX.writeFile(wb, filename);
   showToast(`${rows.length} filas exportadas`, 'success');
 }
 

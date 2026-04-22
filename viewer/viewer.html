@@ -21,14 +21,54 @@
   <!-- Supabase client (exposes window.supabase for lib/supabase.js) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- SheetJS (community) for Excel export -->
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- xlsx-js-style (SheetJS fork with cell styles) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
   <meta name="theme-color" content="#FFFFFF">
   <style>
+    /* ── Subtramos editor ─────────────────────────────────── */
+    #subtramosTable { table-layout: auto; width: 100%; }
+    #subtramosTable th, #subtramosTable td {
+      padding: 6px 8px;
+      font-size: var(--fs-xs);
+      vertical-align: middle;
+    }
+    #subtramosTable td select,
+    #subtramosTable td input[type="text"] {
+      width: 100%;
+      min-width: 120px;
+      padding: 5px 8px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--text);
+    }
+    #subtramosTable td select:focus,
+    #subtramosTable td input:focus {
+      outline: none;
+      border-color: var(--text-secondary);
+    }
+    #subtramosTable td:first-child { width: 56px; text-align: center; }
+    #subtramosTable td:nth-child(2) { width: 28px; text-align: center; color: var(--text-muted); }
+    #subtramosTable td:last-child { width: 64px; }
+    #subtramosTable .row-remove {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 4px 8px;
+      border-radius: var(--r-sm);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    #subtramosTable .row-remove:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
     .back-btn {
       display: inline-flex;
       align-items: center;
@@ -742,9 +782,9 @@
               Solo los marcados como <strong>Activos</strong> se incluyen en el Excel.
             </p>
             <div class="btn-group" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
-              <button class="btn btn-sm btn-secondary" id="btnAddSubtramo">+ Añadir subtramo</button>
-              <button class="btn btn-sm btn-secondary" id="btnAutoSubtramos" title="Detecta la secuencia de nodos que cruza el recorrido activo y rellena esta lista">Auto desde recorrido activo</button>
-              <button class="btn btn-sm btn-danger"    id="btnClearSubtramos" title="Vaciar la lista">Vaciar</button>
+              <button class="btn btn-sm btn-secondary" id="btnAddSubtramo">Añadir fila</button>
+              <button class="btn btn-sm btn-secondary" id="btnAutoSubtramos" title="Recalcula la lista a partir del recorrido activo">Regenerar</button>
+              <button class="btn btn-sm btn-secondary" id="btnClearSubtramos" title="Vaciar la lista">Vaciar</button>
             </div>
 
             <div class="segments-table-wrap">
