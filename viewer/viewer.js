@@ -82,7 +82,6 @@ const el = {
   tabData: $('tabData'),
   tabSegments: $('tabSegments'),
   // Study metadata
-  smFecha:    $('smFecha'),
   smCorredor: $('smCorredor'),
   smTipo:     $('smTipo'),
   smPeriodo:  $('smPeriodo'),
@@ -103,32 +102,9 @@ async function init() {
 
   initMap();
   bindEvents();
-  initStudyMeta();
   loadTrackList();
   initPlayback(map);
   refreshTramos();
-}
-
-function initStudyMeta() {
-  // Default date = today (local)
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  if (el.smFecha && !el.smFecha.value) el.smFecha.value = `${yyyy}-${mm}-${dd}`;
-}
-
-function renderCorredoresDropdown() {
-  if (!el.smCorredor) return;
-  const prev = el.smCorredor.value;
-  el.smCorredor.innerHTML = '<option value="">— Seleccionar —</option>';
-  for (const c of corridorsCache) {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    el.smCorredor.appendChild(opt);
-  }
-  if (prev && corridorsCache.some((c) => c.id === prev)) el.smCorredor.value = prev;
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -542,7 +518,6 @@ async function refreshTramos() {
   tramosCache = tRes.tramos;
   corridorsCache = cRes.ok ? cRes.corridors : [];
   renderTramoDropdown();
-  renderCorredoresDropdown();
 }
 
 function renderTramoDropdown() {
