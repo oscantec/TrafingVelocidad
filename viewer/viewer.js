@@ -20,6 +20,8 @@ let trackPoints = [];       // Current track points
 let referenceNodes = [];    // Loaded reference nodes
 let segmentResults = [];    // Computed segments with metrics
 let matchResults = [];      // Node-to-track matching results
+let recorridos = [];        // [{ id, name, points, startTs }] sorted ascending by startTs
+let activeRecorridoId = null;
 
 // Leaflet layers
 let map = null;
@@ -79,6 +81,16 @@ const el = {
   toastContainer: $('toastContainer'),
   tabData: $('tabData'),
   tabSegments: $('tabSegments'),
+  // Study metadata
+  smFecha:    $('smFecha'),
+  smCorredor: $('smCorredor'),
+  smTipo:     $('smTipo'),
+  smPeriodo:  $('smPeriodo'),
+  // Recorridos list
+  recorridosBox:   $('recorridosBox'),
+  recorridosCount: $('recorridosCount'),
+  recorridosList:  $('recorridosList'),
+  btnClearRecorridos: $('btnClearRecorridos'),
 };
 
 // ── Initialize ───────────────────────────────────────────────
@@ -91,9 +103,32 @@ async function init() {
 
   initMap();
   bindEvents();
+  initStudyMeta();
   loadTrackList();
   initPlayback(map);
   refreshTramos();
+}
+
+function initStudyMeta() {
+  // Default date = today (local)
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  if (el.smFecha && !el.smFecha.value) el.smFecha.value = `${yyyy}-${mm}-${dd}`;
+}
+
+function renderCorredoresDropdown() {
+  if (!el.smCorredor) return;
+  const prev = el.smCorredor.value;
+  el.smCorredor.innerHTML = '<option value="">— Seleccionar —</option>';
+  for (const c of corridorsCache) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    el.smCorredor.appendChild(opt);
+  }
+  if (prev && corridorsCache.some((c) => c.id === prev)) el.smCorredor.value = prev;
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -131,6 +166,9 @@ function bindEvents() {
 
   // Track from pasted content
   el.btnLoadPaste.addEventListener('click', handleTrackPasteImport);
+
+  // Recorridos list — clear all
+  el.btnClearRecorridos.addEventListener('click', clearRecorridos);
 
   // Nodes from file
   // Tramificación
@@ -229,6 +267,7 @@ async function handleTrackSelect() {
   if (!raw) return;
 
   const [origin, id] = raw.split(':');
+  const label = el.trackSelect.options[el.trackSelect.selectedIndex]?.textContent || id;
   try {
     let points;
     if (origin === 'cloud') {
@@ -246,7 +285,8 @@ async function handleTrackSelect() {
       points = await getTrackPoints(id);
       showToast(`Track cargado: ${points.length} puntos`, 'success');
     }
-    loadTrackData(points);
+    addRecorrido({ name: label, points });
+    el.trackSelect.value = '';
   } catch (err) {
     console.error('[viewer] track select error:', err);
     showToast(`Error cargando track: ${err.message || err}`, 'error');
@@ -254,18 +294,25 @@ async function handleTrackSelect() {
 }
 
 async function handleTrackFileImport(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  const files = Array.from(event.target.files || []);
+  if (!files.length) return;
 
-  try {
-    const text = await readFileAsText(file);
-    const { name, points } = parseTrackContent(text, file.name);
-    loadTrackData(points);
-    showToast(`Archivo importado (${name}): ${points.length} puntos`, 'success');
-  } catch (err) {
-    console.error('[Viewer] Import error:', err);
-    showToast(`Error importando: ${err.message}`, 'error');
+  let ok = 0, fail = 0;
+  for (const file of files) {
+    try {
+      const text = await readFileAsText(file);
+      const { name, points } = parseTrackContent(text, file.name);
+      addRecorrido({ name: name || file.name, points });
+      ok++;
+    } catch (err) {
+      console.error('[Viewer] Import error:', file.name, err);
+      fail++;
+    }
   }
+  // Reset so the same files can be re-selected later
+  event.target.value = '';
+  if (ok) showToast(`Cargado(s) ${ok} recorrido(s)${fail ? ` · ${fail} con error` : ''}`, fail ? 'warning' : 'success');
+  else    showToast('No se pudo importar ningún archivo', 'error');
 }
 
 async function handleTrackUrlImport() {
@@ -279,7 +326,8 @@ async function handleTrackUrlImport() {
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const text = await resp.text();
     const { name, points } = parseTrackContent(text, url);
-    loadTrackData(points);
+    addRecorrido({ name: name || url, points });
+    el.trackUrlInput.value = '';
     showToast(`URL importada (${name}): ${points.length} puntos`, 'success');
   } catch (err) {
     console.error('[Viewer] URL import error:', err);
@@ -301,11 +349,110 @@ function handleTrackPasteImport() {
 
   try {
     const { name, points } = parseTrackContent(text);
-    loadTrackData(points);
+    addRecorrido({ name: name || 'Contenido pegado', points });
+    el.trackPasteInput.value = '';
     showToast(`Contenido cargado (${name}): ${points.length} puntos`, 'success');
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error', 6000);
   }
+}
+
+// ── Recorridos list ──────────────────────────────────────────
+function addRecorrido({ name, points }) {
+  if (!points || !points.length) return;
+  const startTs = points[0]?.timestamp || Date.now();
+  const rec = {
+    id: `rec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name,
+    points,
+    startTs,
+  };
+  recorridos.push(rec);
+  recorridos.sort((a, b) => a.startTs - b.startTs);
+  activeRecorridoId = rec.id;
+  renderRecorridosList();
+  loadTrackData(points);
+}
+
+function renderRecorridosList() {
+  if (!recorridos.length) {
+    el.recorridosBox.classList.add('hidden');
+    el.recorridosCount.textContent = '0';
+    el.recorridosList.innerHTML = '';
+    return;
+  }
+  el.recorridosBox.classList.remove('hidden');
+  el.recorridosCount.textContent = String(recorridos.length);
+
+  const fmt = (ts) => new Date(ts).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
+
+  el.recorridosList.innerHTML = recorridos.map((r, i) => {
+    const isActive = r.id === activeRecorridoId;
+    const bg = isActive ? 'background:var(--accent-dim);' : '';
+    return `
+      <div class="node-item" data-id="${r.id}" style="cursor:pointer;${bg}">
+        <div style="flex:1;min-width:0;">
+          <span class="node-name">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
+          <span class="node-coords">${fmt(r.startTs)} · ${r.points.length} pts</span>
+        </div>
+        <button class="btn btn-sm btn-danger" data-remove title="Quitar">✕</button>
+      </div>`;
+  }).join('');
+
+  el.recorridosList.querySelectorAll('[data-id]').forEach((row) => {
+    row.addEventListener('click', (ev) => {
+      if (ev.target.closest('[data-remove]')) return;
+      activateRecorrido(row.dataset.id);
+    });
+  });
+  el.recorridosList.querySelectorAll('[data-remove]').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const row = ev.currentTarget.closest('[data-id]');
+      if (row) removeRecorrido(row.dataset.id);
+    });
+  });
+}
+
+function activateRecorrido(id) {
+  const rec = recorridos.find((r) => r.id === id);
+  if (!rec) return;
+  activeRecorridoId = id;
+  renderRecorridosList();
+  loadTrackData(rec.points);
+}
+
+function removeRecorrido(id) {
+  const idx = recorridos.findIndex((r) => r.id === id);
+  if (idx === -1) return;
+  recorridos.splice(idx, 1);
+  if (activeRecorridoId === id) {
+    activeRecorridoId = recorridos[0]?.id || null;
+    if (recorridos[0]) loadTrackData(recorridos[0].points);
+    else {
+      trackPoints = [];
+      clearSegments();
+      if (baseTrackLayer) { map.removeLayer(baseTrackLayer); baseTrackLayer = null; }
+      if (baseTrackDecorator) { map.removeLayer(baseTrackDecorator); baseTrackDecorator = null; }
+      el.trackInfo.classList.add('hidden');
+      updateProcessButton();
+    }
+  }
+  renderRecorridosList();
+}
+
+function clearRecorridos() {
+  if (!recorridos.length) return;
+  if (!confirm(`¿Vaciar los ${recorridos.length} recorrido(s)?`)) return;
+  recorridos = [];
+  activeRecorridoId = null;
+  renderRecorridosList();
+  trackPoints = [];
+  clearSegments();
+  if (baseTrackLayer) { map.removeLayer(baseTrackLayer); baseTrackLayer = null; }
+  if (baseTrackDecorator) { map.removeLayer(baseTrackDecorator); baseTrackDecorator = null; }
+  el.trackInfo.classList.add('hidden');
+  updateProcessButton();
 }
 
 function loadTrackData(points) {
@@ -379,6 +526,7 @@ async function refreshTramos() {
   tramosCache = tRes.tramos;
   corridorsCache = cRes.ok ? cRes.corridors : [];
   renderTramoDropdown();
+  renderCorredoresDropdown();
 }
 
 function renderTramoDropdown() {
