@@ -68,57 +68,6 @@
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
 
-    /* ── Top Bar ──────────────────────────────────────── */
-    .topbar {
-      padding: 14px 20px;
-      padding-top: calc(14px + var(--safe-top));
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text);
-      white-space: nowrap;
-    }
-
-    .chip .icon { color: var(--accent); flex-shrink: 0; }
-
-    .version-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 12px;
-      background: var(--accent-soft);
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--accent);
-      letter-spacing: 0.02em;
-    }
-
-    .version-chip .dot {
-      width: 6px;
-      height: 6px;
-      background: var(--accent);
-      border-radius: 50%;
-    }
-
     /* ── Hero ─────────────────────────────────────────── */
     .main {
       flex: 1;
@@ -154,7 +103,7 @@
       font-weight: 800;
       letter-spacing: -0.03em;
       color: var(--text);
-      margin-bottom: 12px;
+      margin-bottom: 36px;
       line-height: 1.1;
       animation: slide-up 0.5s 0.05s var(--ease) backwards;
     }
@@ -162,15 +111,6 @@
     .hero-title em {
       font-style: normal;
       color: var(--accent);
-    }
-
-    .hero-sub {
-      font-size: 15px;
-      color: var(--text-soft);
-      max-width: 520px;
-      line-height: 1.6;
-      margin-bottom: 36px;
-      animation: slide-up 0.5s 0.1s var(--ease) backwards;
     }
 
     /* ── Module Grid ──────────────────────────────────── */
@@ -187,7 +127,7 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--r-xl);
-      padding: 32px 28px;
+      padding: 36px 24px;
       text-align: center;
       box-shadow: var(--shadow-sm);
       transition: transform 220ms var(--ease), box-shadow 220ms var(--ease), border-color 220ms var(--ease);
@@ -197,7 +137,10 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
+      gap: 14px;
     }
+    .module-card .module-icon { margin-bottom: 0; }
 
     .module-card::before {
       content: '';
@@ -241,45 +184,28 @@
       font-size: 20px;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 8px;
       letter-spacing: -0.01em;
-    }
-
-    .module-card p {
-      font-size: 13.5px;
-      color: var(--text-soft);
-      line-height: 1.55;
-      margin-bottom: 18px;
-    }
-
-    .feature-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: center;
-      margin-top: auto;
-    }
-
-    .feature-tag {
-      padding: 4px 10px;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-soft);
-      letter-spacing: 0.02em;
     }
 
     /* ── Footer ───────────────────────────────────────── */
     .footer {
-      padding: 16px 20px;
-      padding-bottom: calc(16px + var(--safe-bottom));
+      padding: 14px 20px;
+      padding-bottom: calc(14px + var(--safe-bottom));
       background: var(--surface);
       border-top: 1px solid var(--border);
-      text-align: center;
-      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--text-muted);
+      font-weight: 600;
+    }
+    .footer img {
+      height: 22px;
+      width: auto;
     }
 
     /* ── Animations ───────────────────────────────────── */
@@ -290,17 +216,12 @@
 
     /* ── Responsive (mobile-first tuning) ─────────────── */
     @media (max-width: 720px) {
-      .topbar { padding: 12px 14px; padding-top: calc(12px + var(--safe-top)); }
-      .chip { padding: 6px 11px; font-size: 12px; }
-      .version-chip { padding: 4px 10px; font-size: 11px; }
-
       .main { padding: 24px 16px 40px; }
 
       .brand-logo { margin-bottom: 22px; }
       .brand-logo img { max-height: 120px; }
 
-      .hero-title { font-size: 24px; }
-      .hero-sub { font-size: 14px; margin-bottom: 26px; }
+      .hero-title { font-size: 24px; margin-bottom: 26px; }
 
       .module-grid {
         grid-template-columns: 1fr;
@@ -310,33 +231,11 @@
       .module-card { padding: 24px 20px; }
       .module-icon { width: 54px; height: 54px; margin-bottom: 14px; }
       .module-card h2 { font-size: 18px; }
-      .module-card p { font-size: 13px; margin-bottom: 14px; }
-    }
-
-    @media (max-width: 380px) {
-      .chip .label-long { display: none; }
     }
   </style>
 </head>
 
 <body>
-
-  <!-- ══════════════ TOP BAR ══════════════ -->
-  <header class="topbar">
-    <div class="chip">
-      <svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-        <path d="M2 17l10 5 10-5"/>
-        <path d="M2 12l10 5 10-5"/>
-      </svg>
-      <span>NextCan <span class="label-long">Tráfico</span></span>
-    </div>
-
-    <div class="version-chip">
-      <span class="dot"></span>
-      v1.0.0
-    </div>
-  </header>
 
   <!-- ══════════════ HERO + MODULES ══════════════ -->
   <main class="main">
@@ -347,11 +246,6 @@
       </div>
 
       <h1 class="hero-title">Tracking &amp; <em>Procesamiento</em></h1>
-      <p class="hero-sub">
-        Captura recorridos GPS de alta precisión y procesa tramos
-        automáticamente con nodos de referencia. Diseñado para
-        ingeniería de tráfico.
-      </p>
 
       <div class="module-grid">
 
@@ -364,16 +258,6 @@
             </svg>
           </div>
           <h2>Captura</h2>
-          <p>
-            Tracking GPS en tiempo real con persistencia local.
-            Exporta GPX y sincroniza con el backend.
-          </p>
-          <div class="feature-tags">
-            <span class="feature-tag">GPS Hi-Res</span>
-            <span class="feature-tag">IndexedDB</span>
-            <span class="feature-tag">Wake Lock</span>
-            <span class="feature-tag">GPX Export</span>
-          </div>
         </a>
 
         <!-- Módulo 2: Procesamiento -->
@@ -387,16 +271,6 @@
             </svg>
           </div>
           <h2>Procesamiento</h2>
-          <p>
-            Carga tracks y nodos de referencia. Segmenta tramos
-            automáticamente con métricas de ingeniería.
-          </p>
-          <div class="feature-tags">
-            <span class="feature-tag">Haversine</span>
-            <span class="feature-tag">Segmentar</span>
-            <span class="feature-tag">Leaflet</span>
-            <span class="feature-tag">Métricas</span>
-          </div>
         </a>
 
       </div>
@@ -405,7 +279,8 @@
 
   <!-- ══════════════ FOOTER ══════════════ -->
   <footer class="footer">
-    NextCan Tráfico · Softrafing Velocidades v1.0.0
+    <span>Powered by</span>
+    <img src="Images/LogoNextCan.png" alt="NextCan">
   </footer>
 
   <script>
