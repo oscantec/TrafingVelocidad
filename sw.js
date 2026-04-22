@@ -4,7 +4,7 @@
  * (browsers do not expose geolocation to service workers).
  */
 
-const CACHE = 'stfvel-v1';
+const CACHE = 'stfvel-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -50,19 +50,19 @@ self.addEventListener('fetch', (event) => {
   // Only handle same-origin GETs; let everything else pass through
   if (event.request.method !== 'GET' || url.origin !== self.location.origin) return;
 
+  // Network-first: always try fresh. Fall back to cache only if offline/failure,
+  // so new deploys are picked up immediately without bumping CACHE each time.
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request)
-          .then((resp) => {
-            if (resp && resp.status === 200) {
-              const copy = resp.clone();
-              caches.open(CACHE).then((c) => c.put(event.request, copy));
-            }
-            return resp;
-          })
-          .catch(() => caches.match('./index.html'))
-    )
+    fetch(event.request)
+      .then((resp) => {
+        if (resp && resp.status === 200) {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(event.request, copy));
+        }
+        return resp;
+      })
+      .catch(() =>
+        caches.match(event.request).then((cached) => cached || caches.match('./index.html'))
+      )
   );
 });
