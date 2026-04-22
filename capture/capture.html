@@ -408,7 +408,7 @@
       <div class="capture-map" style="position:relative;">
         <div id="captureMap"></div>
         <div id="gpsErrorOverlay" class="gps-error-overlay hidden">
-          <h3>⚠ Sin acceso GPS</h3>
+          <h3>Sin acceso GPS</h3>
           <p id="gpsErrorMessage">
             Se requiere permiso de ubicación para capturar recorridos.
           </p>
@@ -420,13 +420,13 @@
     <!-- Controls -->
     <div class="capture-controls">
       <button class="btn btn-secondary" id="btnResume" disabled title="Reanudar">
-        ▶ Reanudar
+        Reanudar
       </button>
       <button class="btn-record" id="btnRecord" title="Iniciar Captura">
         <div class="rec-icon"></div>
       </button>
       <button class="btn btn-secondary" id="btnPause" disabled title="Pausar">
-        ⏸ Pausar
+        Pausar
       </button>
     </div>
 
@@ -435,15 +435,15 @@
       <div class="flex items-center gap-sm">
         <span id="currentTrackName" class="text-sm text-secondary mono" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
         <button class="btn btn-sm btn-secondary" id="btnHistory" title="Historial">
-          📋
+          Historial
         </button>
       </div>
       <div class="btn-group">
         <button class="btn btn-sm btn-success" id="btnDownloadGPX" disabled>
-          ⬇ GPX
+          Descargar GPX
         </button>
         <button class="btn btn-sm btn-secondary" id="btnDownloadJSON" disabled>
-          ⬇ JSON
+          Descargar JSON
         </button>
       </div>
     </div>
@@ -465,7 +465,7 @@
                    placeholder="Ej: Carrera 7 — tramo norte" autocomplete="off">
           </div>
           <div style="background: var(--warning-dim); padding: 10px 12px; border-radius: var(--r-md); color: var(--text-secondary); font-size: var(--fs-xs); line-height: 1.55;">
-            <strong style="color: var(--warning); display:block; margin-bottom:4px;">⚠ Captura continua</strong>
+            <strong style="color: var(--warning); display:block; margin-bottom:4px;">Captura continua</strong>
             La grabación seguirá hasta que pulses <strong>STOP</strong>. Mantén la pantalla encendida; al minimizar o cambiar de app el navegador puede suspender el GPS.
           </div>
         </div>
@@ -479,7 +479,7 @@
     <!-- Supabase RLS Setup Modal -->
     <div class="modal-overlay" id="rlsModal">
       <div class="modal" style="max-width:640px;">
-        <div class="modal-title">⚙ Configuración de Supabase pendiente</div>
+        <div class="modal-title">Configuración de Supabase pendiente</div>
         <div class="modal-body">
           <p style="margin-bottom:12px;">
             Las tablas <code>tracks</code> y <code>gps_points</code> existen en Supabase, pero
@@ -491,11 +491,11 @@
           </p>
           <pre id="rlsSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:220px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
           <div class="btn-group" style="margin-top:12px;">
-            <button class="btn btn-sm btn-primary" id="rlsCopy">📋 Copiar SQL</button>
+            <button class="btn btn-sm btn-primary" id="rlsCopy">Copiar SQL</button>
             <a class="btn btn-sm btn-secondary"
                href="https://supabase.com/dashboard/project/wqewsreqemthzaecpiqu/sql/new"
                target="_blank" rel="noopener">
-              ↗ Abrir SQL Editor
+              Abrir SQL Editor
             </a>
           </div>
           <p style="margin-top:14px;font-size:11px;color:var(--text-muted);">

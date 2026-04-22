@@ -20,8 +20,11 @@ let trackPoints = [];       // Current track points
 let referenceNodes = [];    // Loaded reference nodes
 let segmentResults = [];    // Computed segments with metrics
 let matchResults = [];      // Node-to-track matching results
-let recorridos = [];        // [{ id, name, points, startTs }] sorted ascending by startTs
+let recorridos = [];        // [{ id, name, points, startTs, sourceUrl }] sorted ascending by startTs
 let activeRecorridoId = null;
+// Per-recorrido editable state for the segments table:
+//   segmentOverrides[recorridoId] = { [segmentIndex]: { active: bool, sentido: string } }
+let segmentOverrides = {};
 
 // Leaflet layers
 let map = null;
@@ -84,7 +87,9 @@ const el = {
   // Study metadata
   smCorredor: $('smCorredor'),
   smTipo:     $('smTipo'),
+  smCalzada:  $('smCalzada'),
   smPeriodo:  $('smPeriodo'),
+  btnExportExcel: $('btnExportExcel'),
   // Recorridos list
   recorridosBox:   $('recorridosBox'),
   recorridosCount: $('recorridosCount'),
@@ -160,8 +165,8 @@ function bindEvents() {
   el.cpSetupCopy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(TRAMIFICATION_SETUP_SQL);
-      el.cpSetupCopy.textContent = '✓ Copiado';
-      setTimeout(() => { el.cpSetupCopy.textContent = '📋 Copiar SQL'; }, 1600);
+      el.cpSetupCopy.textContent = 'Copiado';
+      setTimeout(() => { el.cpSetupCopy.textContent = 'Copiar SQL'; }, 1600);
     } catch {}
   });
   el.cpSetupClose.addEventListener('click', () => el.cpSetupModal.classList.remove('active'));
@@ -184,6 +189,7 @@ function bindEvents() {
 
   // Process
   el.btnProcess.addEventListener('click', processSegmentation);
+  if (el.btnExportExcel) el.btnExportExcel.addEventListener('click', exportExcel);
 
   // Tabs
   document.querySelectorAll('.panel-tab').forEach((tab) => {
@@ -208,11 +214,11 @@ async function loadTrackList() {
 
   if (localTracks.length) {
     const grpLocal = document.createElement('optgroup');
-    grpLocal.label = '💾 Local';
+    grpLocal.label = 'Local';
     for (const t of localTracks) {
       const opt = document.createElement('option');
       opt.value = `local:${t.id}`;
-      const cloudMark = t.synced ? ' ☁' : '';
+      const cloudMark = t.synced ? ' (nube)' : '';
       opt.textContent = `${t.name}${cloudMark} · ${fmtDate(t.startTime)} · ${t.pointCount || '?'} pts`;
       grpLocal.appendChild(opt);
     }
@@ -223,7 +229,7 @@ async function loadTrackList() {
   const cloudOnly = cloudTracks.filter((t) => !t.local_id || !localIds.has(t.local_id));
   if (cloudOnly.length) {
     const grpCloud = document.createElement('optgroup');
-    grpCloud.label = '☁ Nube (otros dispositivos)';
+    grpCloud.label = 'Nube (otros dispositivos)';
     for (const t of cloudOnly) {
       const opt = document.createElement('option');
       opt.value = `cloud:${t.id}`;
@@ -256,7 +262,7 @@ async function handleTrackSelect() {
         altitude: p.altitude ?? null,
         timestamp: new Date(p.timestamp).getTime(),
       }));
-      showToast(`Track ☁ cargado desde la nube: ${points.length} puntos`, 'success');
+      showToast(`Track cargado desde la nube: ${points.length} puntos`, 'success');
     } else {
       points = await getTrackPoints(id);
       showToast(`Track cargado: ${points.length} puntos`, 'success');
@@ -300,7 +306,7 @@ async function handleTrackUrlImport() {
     el.btnLoadUrl.textContent = '…';
     const text = await fetchUrlWithFallback(url);
     const { name, points } = parseTrackContent(text, url);
-    addRecorrido({ name: name || url, points });
+    addRecorrido({ name: name || url, points, sourceUrl: url });
     el.trackUrlInput.value = '';
     showToast(`URL importada (${name}): ${points.length} puntos`, 'success');
   } catch (err) {
@@ -350,7 +356,7 @@ function handleTrackPasteImport() {
 }
 
 // ── Recorridos list ──────────────────────────────────────────
-function addRecorrido({ name, points }) {
+function addRecorrido({ name, points, sourceUrl = '' }) {
   if (!points || !points.length) return;
   const startTs = points[0]?.timestamp || Date.now();
   const rec = {
@@ -358,6 +364,7 @@ function addRecorrido({ name, points }) {
     name,
     points,
     startTs,
+    sourceUrl,
   };
   recorridos.push(rec);
   recorridos.sort((a, b) => a.startTs - b.startTs);
@@ -387,7 +394,7 @@ function renderRecorridosList() {
           <span class="node-name">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
           <span class="node-coords">${fmt(r.startTs)} · ${r.points.length} pts</span>
         </div>
-        <button class="btn btn-sm btn-danger" data-remove title="Quitar">✕</button>
+        <button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button>
       </div>`;
   }).join('');
 
@@ -572,7 +579,7 @@ function toggleDrawingMode() {
   drawingMode = !drawingMode;
   el.btnDrawPoints.classList.toggle('btn-success', drawingMode);
   el.btnDrawPoints.classList.toggle('btn-primary', !drawingMode);
-  el.btnDrawPoints.textContent = drawingMode ? '✓ Dibujo activo — clic para terminar' : '✏ Dibujar en mapa';
+  el.btnDrawPoints.textContent = drawingMode ? 'Dibujo activo — clic para terminar' : 'Dibujar en mapa';
   el.drawingHint.classList.toggle('hidden', !drawingMode);
   const container = map.getContainer();
   container.style.cursor = drawingMode ? 'crosshair' : '';
@@ -634,7 +641,7 @@ function displayNodes(nodes) {
 
   el.nodesList.innerHTML = nodes.map((n, i) => {
     const mark = n.cloud
-      ? '<span class="badge badge-success" style="padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">☁</span>'
+      ? '<span class="badge badge-success" style="padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">nube</span>'
       : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">local</span>';
     return `
       <div class="node-item" data-id="${n.id}">
@@ -642,7 +649,7 @@ function displayNodes(nodes) {
           <span class="node-name">${i + 1}. ${escapeHtml(n.name)} ${mark}</span>
           <span class="node-coords">${Number(n.lat).toFixed(6)}, ${Number(n.lng).toFixed(6)}</span>
         </div>
-        <button class="btn btn-sm btn-danger" data-remove title="Quitar">✕</button>
+        <button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button>
       </div>`;
   }).join('');
 
@@ -854,6 +861,38 @@ function drawNodeMarkers(nodes) {
 }
 
 // ── Segmentation Processing ──────────────────────────────────
+// Pure helper: given a track's points, apply current reference nodes and
+// return the computed segment-result array. Used by both the UI ("Segmentar
+// track" button) and the Excel exporter (which processes every recorrido).
+function runSegmentationOn(points, threshold) {
+  const mr = matchNodesToTrack(referenceNodes, points, threshold);
+  const validMatches = mr.filter((m) => m.withinThreshold);
+  if (validMatches.length === 0) return { results: [], matches: mr };
+
+  const cutIndices = validMatches.map((m) => m.trackIndex);
+  const segments = segmentTrack(points, cutIndices);
+
+  const results = segments.map((seg, i) => {
+    const metrics = segmentMetrics(seg.points);
+    const startNode = findNodeAtIndex(validMatches, seg.startIndex);
+    const endNode = findNodeAtIndex(validMatches, seg.endIndex);
+    const first = seg.points[0];
+    const last  = seg.points[seg.points.length - 1];
+    return {
+      index: i + 1,
+      startIndex: seg.startIndex,
+      endIndex: seg.endIndex,
+      startNode: startNode ? startNode.node.name : 'Inicio',
+      endNode: endNode ? endNode.node.name : (i === segments.length - 1 ? 'Fin' : '→'),
+      points: seg.points,
+      firstPointTime: first ? first.timestamp : null,
+      lastPointTime:  last  ? last.timestamp  : null,
+      ...metrics,
+    };
+  });
+  return { results, matches: mr };
+}
+
 function processSegmentation() {
   if (trackPoints.length === 0 || referenceNodes.length === 0) {
     showToast('Carga un track y nodos primero', 'warning');
@@ -867,45 +906,16 @@ function processSegmentation() {
   // Use requestAnimationFrame to let the UI update before heavy computation
   requestAnimationFrame(() => {
     try {
-      // Step 1: Match nodes to track
-      matchResults = matchNodesToTrack(referenceNodes, trackPoints, threshold);
+      const { results, matches } = runSegmentationOn(trackPoints, threshold);
+      matchResults = matches;
+      updateNodesWithDistances(matches);
 
-      // Update nodes list with distances
-      updateNodesWithDistances(matchResults);
-
-      // Filter only nodes within threshold
-      const validMatches = matchResults.filter((m) => m.withinThreshold);
-
-      if (validMatches.length === 0) {
+      if (results.length === 0) {
         showToast(`Ningún nodo dentro del umbral de ${threshold}m. Aumenta el umbral.`, 'warning');
         showBadge(`0 nodos válidos`, 'danger');
         return;
       }
-
-      // Step 2: Get cut indices
-      const cutIndices = validMatches.map((m) => m.trackIndex);
-
-      // Step 3: Segment the track
-      const segments = segmentTrack(trackPoints, cutIndices);
-
-      // Step 4: Calculate metrics for each segment
-      segmentResults = segments.map((seg, i) => {
-        const metrics = segmentMetrics(seg.points);
-        
-        // Determine start/end node names
-        const startNode = findNodeAtIndex(validMatches, seg.startIndex);
-        const endNode = findNodeAtIndex(validMatches, seg.endIndex);
-
-        return {
-          index: i + 1,
-          startIndex: seg.startIndex,
-          endIndex: seg.endIndex,
-          startNode: startNode ? startNode.node.name : 'Inicio',
-          endNode: endNode ? endNode.node.name : (i === segments.length - 1 ? 'Fin' : `→`),
-          points: seg.points,
-          ...metrics,
-        };
-      });
+      segmentResults = results;
 
       // Step 5: Render
       renderSegmentsOnMap(segmentResults);
@@ -1019,42 +1029,73 @@ function clearSegmentLayers() {
 }
 
 // ── Segments Table ───────────────────────────────────────────
-function renderSegmentsTable(segments) {
-  const colors = generateSegmentColors(segments.length);
+function getOverride(recId, idx) {
+  if (!recId) return { active: true, sentido: '' };
+  const r = segmentOverrides[recId] || (segmentOverrides[recId] = {});
+  return r[idx] || (r[idx] = { active: true, sentido: '' });
+}
 
+function formatClock(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+}
+
+function renderSegmentsTable(segments) {
   el.noSegments.classList.add('hidden');
   el.segmentsTable.classList.remove('hidden');
 
-  el.segmentsBody.innerHTML = segments.map((seg, i) => `
+  const recId = activeRecorridoId;
+
+  el.segmentsBody.innerHTML = segments.map((seg, i) => {
+    const ov = getOverride(recId, i);
+    const sentido = escapeHtml(ov.sentido || '');
+    return `
     <tr data-segment="${i}">
+      <td style="text-align:center;"><input type="checkbox" data-active ${ov.active ? 'checked' : ''}></td>
       <td>${seg.index}</td>
-      <td><span class="segment-color" style="background:${colors[i]}"></span></td>
-      <td>${seg.startNode}</td>
-      <td>${seg.endNode}</td>
+      <td>${escapeHtml(seg.startNode)}</td>
+      <td>${escapeHtml(seg.endNode)}</td>
+      <td><input type="text" class="form-input" data-sentido value="${sentido}" placeholder="S - N" style="padding:4px 6px;font-size:11px;min-width:64px;"></td>
+      <td class="mono">${formatClock(seg.firstPointTime)}</td>
+      <td class="mono">${formatClock(seg.lastPointTime)}</td>
       <td>${formatDistance(seg.distance)}</td>
       <td>${formatDuration(seg.time)}</td>
       <td>${formatSpeed(seg.avgSpeed)} km/h</td>
-      <td>${formatSpeed(seg.maxSpeed)} km/h</td>
-      <td>${seg.pointCount}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 
-  // Row hover → highlight segment on map
   el.segmentsBody.querySelectorAll('tr').forEach((row) => {
     const idx = parseInt(row.dataset.segment);
 
+    // Inline edits — active checkbox + sentido input
+    const chk = row.querySelector('[data-active]');
+    if (chk) chk.addEventListener('change', (ev) => {
+      getOverride(recId, idx).active = ev.target.checked;
+      row.style.opacity = ev.target.checked ? '' : '0.45';
+    });
+    if (chk && !chk.checked) row.style.opacity = '0.45';
+
+    const sent = row.querySelector('[data-sentido]');
+    if (sent) sent.addEventListener('input', (ev) => {
+      getOverride(recId, idx).sentido = ev.target.value;
+    });
+
+    // Row hover / click interactions — guard so that clicks on the
+    // editable cells don't bubble into "zoom to segment".
     row.addEventListener('mouseenter', () => {
       highlightSegment(idx);
       row.classList.add('highlighted');
     });
-
     row.addEventListener('mouseleave', () => {
       unhighlightSegment(idx);
       row.classList.remove('highlighted');
     });
-
-    row.addEventListener('click', () => {
-      // Zoom to segment
+    row.addEventListener('click', (ev) => {
+      if (ev.target.closest('input')) return;
       if (segmentLayers[idx]) {
         map.fitBounds(segmentLayers[idx].getBounds(), { padding: [60, 60] });
       }
@@ -1168,6 +1209,87 @@ function showToast(message, type = 'info') {
     toast.style.animation = 'fade-in 0.3s var(--ease-out) reverse';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+// ── Excel export ─────────────────────────────────────────────
+function fechaLargaEs(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleDateString('es-CO', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+}
+
+function diaClasificacion(ts) {
+  if (!ts) return '';
+  const dow = new Date(ts).getDay(); // 0 domingo, 6 sábado
+  return (dow === 0 || dow === 6) ? 'ATIPICO' : 'TIPICO';
+}
+
+function exportExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  if (!recorridos.length) {
+    showToast('Carga al menos un recorrido antes de exportar.', 'warning');
+    return;
+  }
+  if (!referenceNodes.length) {
+    showToast('Carga los puntos de control antes de exportar.', 'warning');
+    return;
+  }
+
+  const threshold = parseFloat(el.thresholdInput.value) || 50;
+  const study = {
+    corredor: (el.smCorredor?.value || '').trim(),
+    tipo:     el.smTipo?.value     || '',
+    calzada:  el.smCalzada?.value  || '',
+    periodo:  el.smPeriodo?.value  || '',
+  };
+
+  const rows = [];
+  recorridos.forEach((rec, ri) => {
+    const consecutivo = ri + 1;
+    const { results } = runSegmentationOn(rec.points, threshold);
+    const overrides = segmentOverrides[rec.id] || {};
+    results.forEach((seg, i) => {
+      const ov = overrides[i] || { active: true, sentido: '' };
+      if (!ov.active) return;
+      rows.push({
+        'DÍA':           diaClasificacion(rec.startTs),
+        'FECHA':         fechaLargaEs(rec.startTs),
+        'PERIODO':       study.periodo,
+        'LINK':          rec.sourceUrl || '',
+        'CORREDOR':      study.corredor,
+        'TRAMO':         `${seg.startNode} - ${seg.endNode}`,
+        'CALZADA':       study.calzada,
+        'RECORRIDO':     consecutivo,
+        'SENTIDO':       ov.sentido || '',
+        'HORA DE INICIO': formatClock(seg.firstPointTime),
+        'HORA LLEGADA':   formatClock(seg.lastPointTime),
+        'DISTANCIA':     +(seg.distance / 1000).toFixed(4),
+        'TIEMPO HORA':   +(seg.time / 3600).toFixed(4),
+        'VELOCIDAD':     +Number(seg.avgSpeed || 0).toFixed(2),
+      });
+    });
+  });
+
+  if (!rows.length) {
+    showToast('No hay tramos activos para exportar. Verifica los puntos de control y los checkboxes.', 'warning');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 10 }, { wch: 28 }, { wch: 10 }, { wch: 40 }, { wch: 16 },
+    { wch: 22 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 12 },
+    { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 10 },
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Recorridos');
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `trafingvelocidad_${stamp}.xlsx`);
+  showToast(`${rows.length} filas exportadas`, 'success');
 }
 
 // ── Boot ─────────────────────────────────────────────────────

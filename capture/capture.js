@@ -355,8 +355,8 @@ function bindEvents() {
   el.rlsCopy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(RLS_SETUP_SQL);
-      el.rlsCopy.textContent = '✓ Copiado';
-      setTimeout(() => { el.rlsCopy.textContent = '📋 Copiar SQL'; }, 1800);
+      el.rlsCopy.textContent = 'Copiado';
+      setTimeout(() => { el.rlsCopy.textContent = 'Copiar SQL'; }, 1800);
     } catch {
       // Fallback: select the text
       const range = document.createRange();
@@ -835,11 +835,11 @@ function renderTracksList(tracks) {
 
   el.savedTracksList.innerHTML = tracks.map((t) => {
     const cloudTag = t.synced
-      ? '<span class="badge badge-success" style="text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">☁ nube</span>'
+      ? '<span class="badge badge-success" style="text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">nube</span>'
       : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">solo local</span>';
     const syncBtn = t.synced
       ? ''
-      : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">☁↑</button>`;
+      : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">Subir</button>`;
     return `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
@@ -850,8 +850,8 @@ function renderTracksList(tracks) {
       </div>
       <div class="btn-group">
         ${syncBtn}
-        <button class="btn btn-sm btn-secondary" onclick="loadTrack('${t.id}')" title="Ver en mapa">👁</button>
-        <button class="btn btn-sm btn-danger" onclick="removeTrack('${t.id}')" title="Eliminar">✕</button>
+        <button class="btn btn-sm btn-secondary" onclick="loadTrack('${t.id}')" title="Ver en mapa">Ver</button>
+        <button class="btn btn-sm btn-danger" onclick="removeTrack('${t.id}')" title="Eliminar">Quitar</button>
       </div>
     </div>`;
   }).join('');

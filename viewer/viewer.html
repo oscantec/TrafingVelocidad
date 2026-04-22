@@ -21,6 +21,9 @@
   <!-- Supabase client (exposes window.supabase for lib/supabase.js) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- SheetJS (community) for Excel export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="manifest" href="../manifest.webmanifest">
   <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
@@ -531,8 +534,8 @@
       <div class="viewer-panel">
         <!-- Tabs -->
         <div class="panel-tabs">
-          <button class="panel-tab active" data-tab="tab-data" id="tabData">📁 Datos</button>
-          <button class="panel-tab" data-tab="tab-segments" id="tabSegments">📊 Tramos</button>
+          <button class="panel-tab active" data-tab="tab-data" id="tabData">Datos</button>
+          <button class="panel-tab" data-tab="tab-segments" id="tabSegments">Tramos</button>
         </div>
 
         <!-- Tab: Data Loading -->
@@ -540,7 +543,6 @@
           <!-- Datos del estudio -->
           <div class="viewer-panel-section">
             <div class="section-header">
-              <div class="section-icon">📝</div>
               <h2>Datos del estudio</h2>
             </div>
 
@@ -561,6 +563,17 @@
             </div>
 
             <div class="form-group">
+              <label class="form-label" for="smCalzada">Calzada</label>
+              <select id="smCalzada" class="form-input">
+                <option value="">— Seleccionar —</option>
+                <option value="Lenta">Lenta</option>
+                <option value="Rápida">Rápida</option>
+                <option value="Única">Única</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+
+            <div class="form-group">
               <label class="form-label" for="smPeriodo">Periodo</label>
               <select id="smPeriodo" class="form-input">
                 <option value="">— Seleccionar —</option>
@@ -573,7 +586,6 @@
           <!-- Track Source -->
           <div class="viewer-panel-section">
             <div class="section-header">
-              <div class="section-icon">📍</div>
               <h2>Track GPS</h2>
             </div>
 
@@ -584,7 +596,7 @@
                 <select id="trackSelect">
                   <option value="">— Seleccionar recorrido —</option>
                 </select>
-                <button class="btn btn-sm btn-secondary" id="btnRefreshTracks" title="Refrescar">↻</button>
+                <button class="btn btn-sm btn-secondary" id="btnRefreshTracks" title="Refrescar">Refrescar</button>
               </div>
             </div>
 
@@ -605,7 +617,7 @@
               <div class="track-selector">
                 <input type="url" id="trackUrlInput" class="form-input mono" style="flex:1;font-size:var(--fs-xs);"
                        placeholder="https://…/track.gpx">
-                <button class="btn btn-sm btn-primary" id="btnLoadUrl" title="Descargar">↓</button>
+                <button class="btn btn-sm btn-primary" id="btnLoadUrl" title="Descargar">Cargar</button>
               </div>
               <div class="text-xs text-muted" style="margin-top:6px;line-height:1.5;">
                 Funciona con URLs directas (GitHub raw, Dropbox, servidor propio). Sitios como
@@ -650,7 +662,7 @@
                   <span class="badge-dot"></span>
                   <span id="recorridosCount">0</span> recorridos
                 </span>
-                <button class="btn btn-sm btn-secondary" id="btnClearRecorridos" title="Vaciar lista">🗑 Vaciar</button>
+                <button class="btn btn-sm btn-secondary" id="btnClearRecorridos" title="Vaciar lista">Vaciar</button>
               </div>
               <div class="nodes-list" id="recorridosList"></div>
             </div>
@@ -659,7 +671,6 @@
           <!-- Puntos de Control (Tramificación) -->
           <div class="viewer-panel-section">
             <div class="section-header">
-              <div class="section-icon">🎯</div>
               <h2>Puntos de Control</h2>
             </div>
 
@@ -670,14 +681,14 @@
                 <select id="savedTramoSelect">
                   <option value="">— Seleccionar —</option>
                 </select>
-                <button class="btn btn-sm btn-secondary" id="btnRefreshTramos" title="Refrescar">↻</button>
+                <button class="btn btn-sm btn-secondary" id="btnRefreshTramos" title="Refrescar">Refrescar</button>
               </div>
             </div>
 
             <!-- Dibujar -->
             <div class="form-group">
               <button class="btn btn-primary w-full" id="btnDrawPoints">
-                ✏ Dibujar en mapa
+                Dibujar en mapa
               </button>
               <div id="drawingHint" class="hidden" style="margin-top:8px;padding:8px 10px;background:var(--accent-dim);color:var(--accent);border-radius:var(--r-md);font-size:var(--fs-xs);font-weight:600;line-height:1.5;">
                 Haz clic en el mapa para añadir un punto. Al final pulsa <strong>Guardar tramo</strong>.
@@ -691,11 +702,11 @@
                   <span class="badge-dot"></span>
                   <span id="nodesCount">0</span> puntos
                 </span>
-                <button class="btn btn-sm btn-secondary" id="btnClearNodes" title="Vaciar lista">🗑 Vaciar</button>
+                <button class="btn btn-sm btn-secondary" id="btnClearNodes" title="Vaciar lista">Vaciar</button>
               </div>
               <div class="nodes-list" id="nodesList"></div>
               <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:10px;">
-                💾 Guardar tramo
+                Guardar tramo
               </button>
             </div>
           </div>
@@ -703,7 +714,6 @@
           <!-- Process -->
           <div class="viewer-panel-section">
             <div class="section-header">
-              <div class="section-icon">⚡</div>
               <h2>Procesar</h2>
             </div>
 
@@ -715,7 +725,7 @@
 
             <div class="process-actions">
               <button class="btn btn-primary w-full" id="btnProcess" disabled>
-                ⚡ Segmentar Track
+                Segmentar track
               </button>
             </div>
           </div>
@@ -725,8 +735,7 @@
         <div class="tab-content" id="tab-segments">
           <div class="viewer-panel-section" id="segmentsSummary" style="display:none;">
             <div class="section-header">
-              <div class="section-icon">📊</div>
-              <h2>Resumen General</h2>
+              <h2>Resumen general</h2>
             </div>
             <div class="summary-metrics">
               <div class="summary-metric">
@@ -734,37 +743,40 @@
                 <div class="value" id="summarySegments">—</div>
               </div>
               <div class="summary-metric">
-                <div class="label">Dist. Total</div>
+                <div class="label">Dist. total</div>
                 <div class="value" id="summaryDistance">—</div>
                 <div class="unit">km</div>
               </div>
               <div class="summary-metric">
-                <div class="label">Vel. Media</div>
+                <div class="label">Vel. media</div>
                 <div class="value" id="summaryAvgSpeed">—</div>
                 <div class="unit">km/h</div>
               </div>
+            </div>
+            <div class="process-actions" style="margin-top:12px;">
+              <button class="btn btn-primary w-full" id="btnExportExcel">Exportar a Excel</button>
             </div>
           </div>
 
           <div class="segments-table-wrap">
             <div id="noSegments" class="empty-state">
-              <div class="empty-state-icon">📊</div>
               <h3>Sin tramos</h3>
-              <p>Carga un track y nodos de referencia, luego presiona "Segmentar Track"</p>
+              <p>Carga un track y puntos de control, luego presiona "Segmentar track".</p>
             </div>
 
             <table class="data-table hidden" id="segmentsTable">
               <thead>
                 <tr>
+                  <th title="Incluir en el Excel">Activo</th>
                   <th>#</th>
-                  <th>Color</th>
-                  <th>Nodo Inicio</th>
-                  <th>Nodo Fin</th>
+                  <th>Nodo inicio</th>
+                  <th>Nodo fin</th>
+                  <th>Sentido</th>
+                  <th>H. inicio</th>
+                  <th>H. llegada</th>
                   <th>Distancia</th>
                   <th>Tiempo</th>
-                  <th>Vel. Media</th>
-                  <th>Vel. Máx</th>
-                  <th>Puntos</th>
+                  <th>Vel. media</th>
                 </tr>
               </thead>
               <tbody id="segmentsBody"></tbody>
@@ -829,9 +841,9 @@
                 <option value="300" selected>Normal</option>
                 <option value="800">Lento</option>
               </select>
-              <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>▶ Play</button>
-              <button class="pb-btn pb-btn-pause" id="pbPause" disabled>❚❚</button>
-              <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>■</button>
+              <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>Play</button>
+              <button class="pb-btn pb-btn-pause" id="pbPause" disabled>Pausa</button>
+              <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>Stop</button>
             </div>
           </div>
         </section>
@@ -844,7 +856,7 @@
     <!-- Supabase setup modal (corridors + tramos + control_points) -->
     <div class="modal-overlay" id="cpSetupModal">
       <div class="modal" style="max-width:680px;">
-        <div class="modal-title">⚙ Tablas de tramificación pendientes</div>
+        <div class="modal-title">Tablas de tramificación pendientes</div>
         <div class="modal-body">
           <p style="margin-bottom:12px;">
             Para guardar <strong>Corredores → Tramos → Puntos de control</strong> en la nube
@@ -853,11 +865,11 @@
           </p>
           <pre id="cpSetupSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
           <div class="btn-group" style="margin-top:12px;">
-            <button class="btn btn-sm btn-primary" id="cpSetupCopy">📋 Copiar SQL</button>
+            <button class="btn btn-sm btn-primary" id="cpSetupCopy">Copiar SQL</button>
             <a class="btn btn-sm btn-secondary"
                href="https://supabase.com/dashboard/project/wqewsreqemthzaecpiqu/sql/new"
                target="_blank" rel="noopener">
-              ↗ Abrir SQL Editor
+              Abrir SQL Editor
             </a>
           </div>
         </div>
