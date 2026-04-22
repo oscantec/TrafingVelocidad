@@ -84,6 +84,13 @@ const el = {
   btnAddSubtramo:   $('btnAddSubtramo'),
   btnAutoSubtramos: $('btnAutoSubtramos'),
   btnClearSubtramos: $('btnClearSubtramos'),
+  // Preview (tab 4)
+  previewEmpty: $('previewEmpty'),
+  previewWrap:  $('previewWrap'),
+  previewHead:  $('previewHead'),
+  previewBody:  $('previewBody'),
+  previewMeta:  $('previewMeta'),
+  btnRefreshPreview: $('btnRefreshPreview'),
   mapLegend: $('mapLegend'),
   toastContainer: $('toastContainer'),
   tabData: $('tabData'),
@@ -200,6 +207,7 @@ function bindEvents() {
   if (el.btnAutoSubtramos)  el.btnAutoSubtramos.addEventListener('click', autoDetectSubtramos);
   if (el.btnClearSubtramos) el.btnClearSubtramos.addEventListener('click', clearSubtramos);
   if (el.btnExportExcel)    el.btnExportExcel.addEventListener('click', exportExcel);
+  if (el.btnRefreshPreview) el.btnRefreshPreview.addEventListener('click', renderPreviewTable);
 
   // Tabs
   document.querySelectorAll('.panel-tab').forEach((tab) => {
@@ -1121,6 +1129,8 @@ function switchTab(tabId) {
   const tab = document.querySelector(`[data-tab="${tabId}"]`);
   const content = document.getElementById(tabId);
 
+  if (tabId === 'tab-tabla') renderPreviewTable();
+
   if (tab) tab.classList.add('active');
   if (content) content.classList.add('active');
 }
@@ -1380,21 +1390,19 @@ function upperOrBlank(v) {
   return String(v).toUpperCase();
 }
 
-function exportExcel() {
-  if (typeof XLSX === 'undefined') {
-    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
-    return;
-  }
-  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
-  if (!subtramos.length)  { showToast('Define al menos un subtramo en la pestaña Tramos.', 'warning'); return; }
-
-  const threshold = parseFloat(el.thresholdInput.value) || 50;
-  const study = {
+function currentStudy() {
+  return {
     corredor: (el.smCorredor?.value || '').trim(),
     tipo:     el.smTipo?.value     || '',
     calzada:  el.smCalzada?.value  || '',
     periodo:  el.smPeriodo?.value  || '',
   };
+}
+
+function computeExportRows() {
+  if (!recorridos.length || !subtramos.length) return [];
+  const threshold = parseFloat(el.thresholdInput.value) || 50;
+  const study = currentStudy();
 
   const rows = [];
   recorridos.forEach((rec, ri) => {
@@ -1420,11 +1428,56 @@ function exportExcel() {
       ]);
     }
   });
+  return rows;
+}
 
+function renderPreviewTable() {
+  if (!el.previewBody) return;
+  const rows = computeExportRows();
+
+  if (!rows.length) {
+    el.previewEmpty.classList.remove('hidden');
+    el.previewWrap.classList.add('hidden');
+    el.previewBody.innerHTML = '';
+    el.previewHead.innerHTML = '';
+    el.previewMeta.textContent = '—';
+    return;
+  }
+
+  el.previewEmpty.classList.add('hidden');
+  el.previewWrap.classList.remove('hidden');
+
+  el.previewHead.innerHTML = EXCEL_HEADERS.map((h) => `<th>${escapeHtml(h)}</th>`).join('');
+
+  const numericCols = new Set([8, 12, 13, 14]); // RECORRIDO, DISTANCIA, TIEMPO HORA, VELOCIDAD
+  const linkCol = 3;                             // LINK
+  el.previewBody.innerHTML = rows.map((row) => {
+    return '<tr>' + row.map((v, ci) => {
+      const cls = ci === linkCol ? 'link' : (numericCols.has(ci) ? 'num' : '');
+      const title = ci === linkCol ? ` title="${escapeHtml(String(v))}"` : '';
+      return `<td class="${cls}"${title}>${escapeHtml(String(v ?? ''))}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+
+  const recs = recorridos.length;
+  const active = subtramos.filter((s) => s.active).length;
+  el.previewMeta.textContent = `${rows.length} filas · ${recs} recorrido(s) · ${active} subtramo(s) activos`;
+}
+
+function exportExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
+  if (!subtramos.length)  { showToast('Define al menos un subtramo.', 'warning'); return; }
+
+  const rows = computeExportRows();
   if (!rows.length) {
     showToast('Ningún subtramo activo pudo matchearse con los recorridos cargados. Revisa nodos y umbral.', 'warning');
     return;
   }
+  const study = currentStudy();
 
   // Sheet name = TIPICO / ATIPICO based on first recorrido's weekday
   const sheetName = diaClasificacion(recorridos[0].startTs) || 'RECORRIDOS';
