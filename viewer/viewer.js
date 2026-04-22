@@ -42,13 +42,9 @@ let cutPointMarkers = [];
 const $ = (id) => document.getElementById(id);
 
 const el = {
-  trackSelect: $('trackSelect'),
-  btnRefreshTracks: $('btnRefreshTracks'),
   trackFileInput: $('trackFileInput'),
   trackUrlInput: $('trackUrlInput'),
   btnLoadUrl: $('btnLoadUrl'),
-  trackPasteInput: $('trackPasteInput'),
-  btnLoadPaste: $('btnLoadPaste'),
   savedTramoSelect:  $('savedTramoSelect'),
   btnRefreshTramos:  $('btnRefreshTramos'),
   btnDrawPoints:     $('btnDrawPoints'),
@@ -70,10 +66,6 @@ const el = {
   thresholdInput: $('thresholdInput'),
   btnProcess: $('btnProcess'),
   processBadge: $('processBadge'),
-  trackInfo: $('trackInfo'),
-  infoPoints: $('infoPoints'),
-  infoDistance: $('infoDistance'),
-  infoDuration: $('infoDuration'),
   nodesInfo: $('nodesInfo'),
   nodesCount: $('nodesCount'),
   nodesList: $('nodesList'),
@@ -118,7 +110,6 @@ async function init() {
 
   initMap();
   bindEvents();
-  loadTrackList();
   initPlayback(map);
   refreshTramos();
   renderSubtramosTable();
@@ -144,24 +135,17 @@ function initMap() {
 
 // ── Event Binding ────────────────────────────────────────────
 function bindEvents() {
-  // Track from DB
-  el.trackSelect.addEventListener('change', handleTrackSelect);
-  el.btnRefreshTracks.addEventListener('click', loadTrackList);
-
   // Track from file
-  el.trackFileInput.addEventListener('change', handleTrackFileImport);
+  if (el.trackFileInput) el.trackFileInput.addEventListener('change', handleTrackFileImport);
 
   // Track from URL
-  el.btnLoadUrl.addEventListener('click', handleTrackUrlImport);
-  el.trackUrlInput.addEventListener('keydown', (e) => {
+  if (el.btnLoadUrl)     el.btnLoadUrl.addEventListener('click', handleTrackUrlImport);
+  if (el.trackUrlInput)  el.trackUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') handleTrackUrlImport();
   });
 
-  // Track from pasted content
-  el.btnLoadPaste.addEventListener('click', handleTrackPasteImport);
-
   // Recorridos list — clear all
-  el.btnClearRecorridos.addEventListener('click', clearRecorridos);
+  if (el.btnClearRecorridos) el.btnClearRecorridos.addEventListener('click', clearRecorridos);
 
   // Nodes from file
   // Tramificación
@@ -217,6 +201,7 @@ function bindEvents() {
 
 // ── Track Loading (local IndexedDB + Supabase cloud) ────────
 async function loadTrackList() {
+  if (!el.trackSelect) return; // dropdown removed from UI
   const fmtDate = (ts) => new Date(ts).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
 
   let localTracks = [];
@@ -263,6 +248,7 @@ async function loadTrackList() {
 }
 
 async function handleTrackSelect() {
+  if (!el.trackSelect) return;
   const raw = el.trackSelect.value;
   if (!raw) return;
 
@@ -360,6 +346,7 @@ async function fetchUrlWithFallback(url) {
 }
 
 function handleTrackPasteImport() {
+  if (!el.trackPasteInput) return;
   const text = (el.trackPasteInput.value || '').trim();
   if (!text) { showToast('Pega el contenido antes de cargar', 'warning'); return; }
 
@@ -406,26 +393,30 @@ function renderRecorridosList() {
 
   el.recorridosList.innerHTML = recorridos.map((r, i) => {
     const isActive = r.id === activeRecorridoId;
-    const bg = isActive ? 'background:var(--accent-dim);' : '';
+    const activeCls = isActive ? ' active' : '';
+    const viewLabel = isActive ? 'Activo' : 'Visualizar';
+    const viewDisabled = isActive ? ' disabled' : '';
     return `
-      <div class="node-item" data-id="${r.id}" style="cursor:pointer;${bg}">
-        <div style="flex:1;min-width:0;">
-          <span class="node-name">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
-          <span class="node-coords">${fmt(r.startTs)} · ${r.points.length} pts</span>
+      <div class="rec-item${activeCls}" data-id="${r.id}">
+        <div class="rec-main">
+          <span class="rec-title">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
+          <span class="rec-meta">${fmt(r.startTs)} · ${r.points.length} pts</span>
         </div>
-        <button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button>
+        <div class="rec-actions">
+          <button class="btn btn-sm btn-primary" data-view${viewDisabled}>${viewLabel}</button>
+          <button class="btn btn-sm btn-secondary" data-remove>Quitar</button>
+        </div>
       </div>`;
   }).join('');
 
-  el.recorridosList.querySelectorAll('[data-id]').forEach((row) => {
-    row.addEventListener('click', (ev) => {
-      if (ev.target.closest('[data-remove]')) return;
-      activateRecorrido(row.dataset.id);
+  el.recorridosList.querySelectorAll('[data-view]').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      const row = ev.currentTarget.closest('[data-id]');
+      if (row) activateRecorrido(row.dataset.id);
     });
   });
   el.recorridosList.querySelectorAll('[data-remove]').forEach((btn) => {
     btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
       const row = ev.currentTarget.closest('[data-id]');
       if (row) removeRecorrido(row.dataset.id);
     });
@@ -453,7 +444,6 @@ function removeRecorrido(id) {
       clearSegments();
       if (baseTrackLayer) { map.removeLayer(baseTrackLayer); baseTrackLayer = null; }
       if (baseTrackDecorator) { map.removeLayer(baseTrackDecorator); baseTrackDecorator = null; }
-      el.trackInfo.classList.add('hidden');
       updateProcessButton();
     }
   }
@@ -470,19 +460,12 @@ function clearRecorridos() {
   clearSegments();
   if (baseTrackLayer) { map.removeLayer(baseTrackLayer); baseTrackLayer = null; }
   if (baseTrackDecorator) { map.removeLayer(baseTrackDecorator); baseTrackDecorator = null; }
-  el.trackInfo.classList.add('hidden');
   updateProcessButton();
 }
 
 function loadTrackData(points) {
   trackPoints = points;
   clearSegments();
-
-  // Show track info
-  el.trackInfo.classList.remove('hidden');
-  el.infoPoints.textContent = points.length;
-  el.infoDistance.textContent = (totalDistance(points) / 1000).toFixed(2);
-  el.infoDuration.textContent = formatDuration(elapsedTime(points));
 
   // Draw track on map
   drawBaseTrack(points);
@@ -1374,9 +1357,17 @@ function subtramoRowsForRecorrido(rec, threshold) {
 const EXCEL_HEADERS = [
   'DÍA', 'FECHA', 'PERIODO', 'LINK', 'CORREDOR', 'TRAMO',
   'CALZADA', 'TIPO DE VEHICULO', 'RECORRIDO', 'SENTIDO',
-  'HORA DE INICIO', 'HORA LLEGADA', 'DISTANCIA', 'TIEMPO HORA', 'VELOCIDAD',
+  'HORA DE INICIO', 'HORA LLEGADA', 'DISTANCIA (KM)', 'TIEMPO RECORRIDO', 'VELOCIDAD KM/H',
 ];
-const EXCEL_COL_WIDTHS = [10, 30, 10, 52, 18, 24, 12, 16, 11, 11, 14, 14, 11, 13, 11];
+const EXCEL_COL_WIDTHS = [10, 30, 10, 52, 18, 24, 12, 16, 11, 11, 14, 14, 14, 16, 14];
+
+function hhmmssFromSeconds(secs) {
+  const s = Math.max(0, Math.round(Number(secs) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+}
 
 // Sanitize a corridor name into a filename-safe slug (upper case, underscores).
 function corredorSlug(name) {
@@ -1422,8 +1413,8 @@ function computeExportRows() {
         upperOrBlank(h.subtramo.sentido || ''),
         formatClock(h.firstPointTime),
         formatClock(h.lastPointTime),
-        +(h.distance / 1000).toFixed(4),
-        +(h.time / 3600).toFixed(4),
+        +(h.distance / 1000).toFixed(2),
+        hhmmssFromSeconds(h.time),
         +Number(h.avgSpeed || 0).toFixed(2),
       ]);
     }
@@ -1522,6 +1513,9 @@ function exportExcel() {
   ws['!rows'] = [{ hpt: 28 }]; // header row a bit taller
   ws['!freeze'] = { xSplit: 0, ySplit: 1 };
   ws['!autofilter'] = { ref: ws['!ref'] };
+  // Hide the sheet's default grid lines — each cell's solid fill already
+  // carries its own border look, so the default grey gridlines are noise.
+  ws['!views'] = [{ showGridLines: false }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);

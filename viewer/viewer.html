@@ -210,15 +210,17 @@
     .pb-stat[data-metric="distance"] .pb-stat-bar-fill { background: #475569; }
     .pb-stat[data-metric="speed"]    .pb-stat-bar-fill { background: var(--accent); }
 
-    /* Chart */
+    /* Chart — full width, solo velocidad */
     .pb-chart {
       position: relative;
-      height: 110px;
+      width: 100%;
+      height: 120px;
       background: var(--surface-alt);
       border: 1px solid var(--border);
       border-radius: var(--r-md);
       padding: 6px 10px;
     }
+    .pb-chart canvas { width: 100% !important; height: 100% !important; }
 
     /* Controls row */
     .pb-controls {
@@ -236,38 +238,49 @@
     }
     .pb-point-info strong { color: var(--text-primary); font-family: var(--font-mono); }
 
-    .pb-transport { display: flex; align-items: center; gap: 6px; }
+    .pb-transport { display: flex; align-items: center; gap: 8px; }
 
     .pb-speed {
-      padding: 5px 8px;
+      padding: 6px 10px;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--r-sm);
+      border-radius: 999px;
       color: var(--text-primary);
       font-size: 11px;
       font-weight: 600;
       cursor: pointer;
     }
 
-    .pb-btn {
+    /* Modern circular transport controls */
+    .pb-icon {
+      width: 34px;
+      height: 34px;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 6px 12px;
-      border-radius: var(--r-sm);
-      font-weight: 600;
-      font-size: 11px;
-      border: 1px solid transparent;
-      transition: all var(--t-fast);
+      justify-content: center;
+      border-radius: 50%;
+      border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text-secondary);
-      border-color: var(--border);
+      cursor: pointer;
+      transition: all var(--t-fast);
+      padding: 0;
     }
-    .pb-btn:hover:not(:disabled) { background: var(--surface-alt); color: var(--text-primary); }
-    .pb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .pb-btn-play.active   { background: var(--success);    color: #fff; border-color: transparent; }
-    .pb-btn-pause.active  { background: #F59E0B;           color: #fff; border-color: transparent; }
-    .pb-btn-stop:hover:not(:disabled)  { background: var(--danger-dim); color: var(--danger); border-color: rgba(220,38,38,0.3); }
+    .pb-icon:hover:not(:disabled) {
+      background: var(--surface-alt);
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+    .pb-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pb-icon-play {
+      width: 42px; height: 42px;
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .pb-icon-play:hover:not(:disabled) { background: var(--accent); filter: brightness(0.95); border-color: var(--accent); }
+    .pb-icon-play.active { background: var(--success); border-color: var(--success); }
+    .pb-icon-pause.active { background: #F59E0B; color: #fff; border-color: #F59E0B; }
 
     /* Media */
     @media (max-width: 900px) {
@@ -279,12 +292,12 @@
       .pb-stat-label { font-size: 8px; letter-spacing: 0.04em; }
       .pb-stat-value { font-size: 13px; }
       .pb-stat-unit, .pb-stat-max { font-size: 9px; }
-      .pb-chart { height: 80px; padding: 4px 6px; }
-      .pb-btn { padding: 5px 9px; font-size: 10px; }
+      .pb-chart { height: 92px; padding: 4px 6px; }
+      .pb-icon { width: 30px; height: 30px; }
+      .pb-icon-play { width: 38px; height: 38px; }
     }
     @media (max-width: 420px) {
       .pb-point-info { display: none; }
-      .pb-btn { padding: 4px 7px; font-size: 10px; }
     }
   </style>
   <style>
@@ -331,6 +344,74 @@
       color: var(--text);
     }
     .viewer-panel .form-input:focus { outline: none; border-color: var(--text-secondary); }
+
+    /* Unified buttons inside the panel */
+    .viewer-panel .btn {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 8px 14px;
+      border-radius: var(--r-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+    .viewer-panel .btn.btn-sm { padding: 6px 10px; font-size: 11px; }
+    .viewer-panel .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .viewer-panel .btn-primary:hover:not(:disabled) { filter: brightness(0.95); }
+    .viewer-panel .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .viewer-panel .btn-secondary:hover:not(:disabled) {
+      background: var(--surface-alt);
+      border-color: var(--text-muted);
+    }
+    .viewer-panel .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Recorridos cargados — row cards */
+    .rec-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .rec-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+    }
+    .rec-item.active { border-color: var(--accent); background: var(--accent-dim); }
+    .rec-item .rec-main { flex: 1; min-width: 0; }
+    .rec-item .rec-title {
+      display: block;
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rec-item .rec-meta {
+      display: block;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .rec-item .rec-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
 
     .viewer-map {
       position: relative;
@@ -690,16 +771,6 @@
             <div class="section-header"><h2>Importar recorrido</h2></div>
 
             <div class="form-group">
-              <label class="form-label">Desde la nube / base local</label>
-              <div class="track-selector">
-                <select id="trackSelect">
-                  <option value="">— Seleccionar recorrido —</option>
-                </select>
-                <button class="btn btn-sm btn-secondary" id="btnRefreshTracks" title="Refrescar">Refrescar</button>
-              </div>
-            </div>
-
-            <div class="form-group">
               <label class="form-label">Archivo(s)</label>
               <div class="file-input-wrapper">
                 <input type="file" multiple accept=".gpx,.json,.kml,.geojson,.xml,.jsp,.txt,.html,.htm" id="trackFileInput">
@@ -714,29 +785,16 @@
                 <button class="btn btn-sm btn-primary" id="btnLoadUrl">Cargar</button>
               </div>
             </div>
-
-            <div class="form-group">
-              <label class="form-label">O pegar contenido</label>
-              <textarea id="trackPasteInput" rows="3" class="form-input mono" style="font-size:11px;line-height:1.4;resize:vertical;" placeholder="Pega el XML del GPX / KML o el GeoJSON…"></textarea>
-              <button class="btn btn-sm btn-secondary w-full" id="btnLoadPaste" style="margin-top:6px;">Cargar contenido pegado</button>
-            </div>
           </div>
 
           <div class="viewer-panel-section">
             <div class="section-header"><h2>Recorridos cargados</h2></div>
-            <div id="trackInfo" class="hidden" style="margin-bottom:10px;">
-              <div class="summary-metrics">
-                <div class="summary-metric"><div class="label">Puntos</div>   <div class="value" id="infoPoints">—</div></div>
-                <div class="summary-metric"><div class="label">Distancia</div><div class="value" id="infoDistance">—</div><div class="unit">km</div></div>
-                <div class="summary-metric"><div class="label">Duración</div> <div class="value" id="infoDuration">—</div></div>
-              </div>
-            </div>
             <div id="recorridosBox" class="hidden">
               <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;">
                 <span class="badge"><span id="recorridosCount">0</span> recorridos</span>
                 <button class="btn btn-sm btn-secondary" id="btnClearRecorridos">Vaciar</button>
               </div>
-              <div class="nodes-list" id="recorridosList"></div>
+              <div class="rec-list" id="recorridosList"></div>
             </div>
           </div>
         </div>
@@ -882,18 +940,24 @@
 
           <div class="pb-controls">
             <span class="pb-point-info">
-              Punto <strong id="pbIndex">0</strong>/<strong id="pbTotal">0</strong>
+              <strong id="pbIndex">0</strong>/<strong id="pbTotal">0</strong>
               · <strong id="pbTimestamp">—</strong>
             </span>
             <div class="pb-transport">
-              <select class="pb-speed" id="pbSpeed">
-                <option value="50">Rápido</option>
-                <option value="300" selected>Normal</option>
-                <option value="800">Lento</option>
+              <select class="pb-speed" id="pbSpeed" aria-label="Velocidad de reproducción">
+                <option value="50">2x</option>
+                <option value="300" selected>1x</option>
+                <option value="800">0.5x</option>
               </select>
-              <button class="pb-btn pb-btn-play"  id="pbPlay"  disabled>Play</button>
-              <button class="pb-btn pb-btn-pause" id="pbPause" disabled>Pausa</button>
-              <button class="pb-btn pb-btn-stop"  id="pbStop"  disabled>Stop</button>
+              <button class="pb-icon pb-icon-stop"  id="pbStop"  disabled aria-label="Detener">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+              </button>
+              <button class="pb-icon pb-icon-play"  id="pbPlay"  disabled aria-label="Reproducir">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <button class="pb-icon pb-icon-pause" id="pbPause" disabled aria-label="Pausar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+              </button>
             </div>
           </div>
         </section>

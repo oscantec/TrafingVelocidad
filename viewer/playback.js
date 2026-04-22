@@ -250,17 +250,16 @@ function rebuildChart() {
   const t0 = state.points[0].timestamp;
   const labels = state.points.map(p => (p.timestamp - t0) / 1000);
   const speeds = state.meta.speedsKmh;
-  const eles   = state.points.map(p => Number.isFinite(p.altitude) ? p.altitude : null);
 
   state.chart = new window.Chart(el.chartCanvas.getContext('2d'), {
     type: 'line',
     data: {
       labels,
       datasets: [
-        { label: 'Vel (km/h)', data: speeds, borderColor: BLUE,  backgroundColor: 'rgba(59,130,246,0.10)',
-          fill: true, yAxisID: 'y',  pointRadius: 0, borderWidth: 1.3, tension: 0.25, spanGaps: true },
-        { label: 'Elev (m)',  data: eles,   borderColor: GREEN, backgroundColor: 'rgba(34,197,94,0.08)',
-          fill: true, yAxisID: 'y1', pointRadius: 0, borderWidth: 1.3, tension: 0.25, spanGaps: true },
+        { label: 'Velocidad (km/h)', data: speeds, borderColor: BLUE,
+          backgroundColor: 'rgba(59,130,246,0.12)',
+          fill: true, yAxisID: 'y', pointRadius: 0, borderWidth: 1.5,
+          tension: 0.25, spanGaps: true },
       ],
     },
     options: {
@@ -276,21 +275,20 @@ function rebuildChart() {
         }
       },
       plugins: {
-        legend: { position: 'top', align: 'end',
-          labels: { usePointStyle: true, boxWidth: 6, boxHeight: 6, font: { size: 10 }, padding: 6 } },
+        legend: { display: false },
         tooltip: {
           backgroundColor: 'rgba(15,23,42,0.9)', titleFont: { size: 10 }, bodyFont: { size: 10 },
           callbacks: {
             title: (items) => `t+${formatDuration(items[0].parsed.x)}`,
-            label: (i) => `${i.dataset.label}: ${i.parsed.y?.toFixed?.(1) ?? '—'}`,
+            label: (i) => `${i.parsed.y?.toFixed?.(1) ?? '—'} km/h`,
           },
         },
       },
       scales: {
-        x: { type: 'linear', ticks: { font: { size: 9 }, maxTicksLimit: 6, callback: (v) => formatDurationShort(v) },
+        x: { type: 'linear', ticks: { font: { size: 10 }, maxTicksLimit: 6, callback: (v) => formatDurationShort(v) },
           grid: { color: 'rgba(148,163,184,0.12)' } },
-        y:  { position: 'left',  ticks: { color: BLUE,  font: { size: 9 } }, grid: { color: 'rgba(148,163,184,0.12)' }, beginAtZero: true },
-        y1: { position: 'right', ticks: { color: GREEN, font: { size: 9 } }, grid: { drawOnChartArea: false } },
+        y: { position: 'left', ticks: { color: BLUE, font: { size: 10 } },
+             grid: { color: 'rgba(148,163,184,0.12)' }, beginAtZero: true },
       },
     },
     plugins: [verticalLinePlugin()],
