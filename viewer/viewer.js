@@ -8,6 +8,7 @@ import {
   haversineDistance, totalDistance, elapsedTime, averageSpeed,
   matchNodesToTrack, segmentTrack, segmentMetrics,
   formatDistance, formatDuration, formatSpeed, generateSegmentColors,
+  findNodeCrossings,
 } from '../lib/geo.js';
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
@@ -22,9 +23,12 @@ let segmentResults = [];    // Computed segments with metrics
 let matchResults = [];      // Node-to-track matching results
 let recorridos = [];        // [{ id, name, points, startTs, sourceUrl }] sorted ascending by startTs
 let activeRecorridoId = null;
-// Per-recorrido editable state for the segments table:
-//   segmentOverrides[recorridoId] = { [segmentIndex]: { active: bool, sentido: string } }
-let segmentOverrides = {};
+
+// Global list of subtramos — shared across all recorridos. Each entry:
+//   { id, active, startNodeId, endNodeId, sentido }
+// startNodeId / endNodeId are reference-node IDs, or the sentinel strings
+// '__start__' (first point of the recorrido) and '__end__' (last point).
+let subtramos = [];
 
 // Leaflet layers
 let map = null;
@@ -73,13 +77,13 @@ const el = {
   nodesInfo: $('nodesInfo'),
   nodesCount: $('nodesCount'),
   nodesList: $('nodesList'),
-  segmentsSummary: $('segmentsSummary'),
-  summarySegments: $('summarySegments'),
-  summaryDistance: $('summaryDistance'),
-  summaryAvgSpeed: $('summaryAvgSpeed'),
-  noSegments: $('noSegments'),
-  segmentsTable: $('segmentsTable'),
-  segmentsBody: $('segmentsBody'),
+  // Subtramos editor (shared list)
+  noSubtramos:     $('noSubtramos'),
+  subtramosTable:  $('subtramosTable'),
+  subtramosBody:   $('subtramosBody'),
+  btnAddSubtramo:   $('btnAddSubtramo'),
+  btnAutoSubtramos: $('btnAutoSubtramos'),
+  btnClearSubtramos: $('btnClearSubtramos'),
   mapLegend: $('mapLegend'),
   toastContainer: $('toastContainer'),
   tabData: $('tabData'),
@@ -110,6 +114,7 @@ async function init() {
   loadTrackList();
   initPlayback(map);
   refreshTramos();
+  renderSubtramosTable();
 }
 
 // ── Map Setup ────────────────────────────────────────────────
@@ -187,9 +192,14 @@ function bindEvents() {
     if (e.target === el.saveTramoModal) el.saveTramoModal.classList.remove('active');
   });
 
-  // Process
+  // Process (segmentación visual del recorrido activo)
   el.btnProcess.addEventListener('click', processSegmentation);
-  if (el.btnExportExcel) el.btnExportExcel.addEventListener('click', exportExcel);
+
+  // Subtramos editor
+  if (el.btnAddSubtramo)    el.btnAddSubtramo.addEventListener('click', () => { addSubtramo(); renderSubtramosTable(); });
+  if (el.btnAutoSubtramos)  el.btnAutoSubtramos.addEventListener('click', autoDetectSubtramos);
+  if (el.btnClearSubtramos) el.btnClearSubtramos.addEventListener('click', clearSubtramos);
+  if (el.btnExportExcel)    el.btnExportExcel.addEventListener('click', exportExcel);
 
   // Tabs
   document.querySelectorAll('.panel-tab').forEach((tab) => {
@@ -635,6 +645,8 @@ function openNodeNamePopup(latlng, defaultName) {
 }
 
 function displayNodes(nodes) {
+  // Reference nodes changed — subtramos dropdowns need to refresh too.
+  renderSubtramosTable();
   if (nodes.length === 0) { el.nodesInfo.classList.add('hidden'); return; }
   el.nodesInfo.classList.remove('hidden');
   el.nodesCount.textContent = nodes.length;
@@ -1029,12 +1041,6 @@ function clearSegmentLayers() {
 }
 
 // ── Segments Table ───────────────────────────────────────────
-function getOverride(recId, idx) {
-  if (!recId) return { active: true, sentido: '' };
-  const r = segmentOverrides[recId] || (segmentOverrides[recId] = {});
-  return r[idx] || (r[idx] = { active: true, sentido: '' });
-}
-
 function formatClock(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -1044,64 +1050,10 @@ function formatClock(ts) {
   return `${hh}:${mm}:${ss}`;
 }
 
-function renderSegmentsTable(segments) {
-  el.noSegments.classList.add('hidden');
-  el.segmentsTable.classList.remove('hidden');
-
-  const recId = activeRecorridoId;
-
-  el.segmentsBody.innerHTML = segments.map((seg, i) => {
-    const ov = getOverride(recId, i);
-    const sentido = escapeHtml(ov.sentido || '');
-    return `
-    <tr data-segment="${i}">
-      <td style="text-align:center;"><input type="checkbox" data-active ${ov.active ? 'checked' : ''}></td>
-      <td>${seg.index}</td>
-      <td>${escapeHtml(seg.startNode)}</td>
-      <td>${escapeHtml(seg.endNode)}</td>
-      <td><input type="text" class="form-input" data-sentido value="${sentido}" placeholder="S - N" style="padding:4px 6px;font-size:11px;min-width:64px;"></td>
-      <td class="mono">${formatClock(seg.firstPointTime)}</td>
-      <td class="mono">${formatClock(seg.lastPointTime)}</td>
-      <td>${formatDistance(seg.distance)}</td>
-      <td>${formatDuration(seg.time)}</td>
-      <td>${formatSpeed(seg.avgSpeed)} km/h</td>
-    </tr>`;
-  }).join('');
-
-  el.segmentsBody.querySelectorAll('tr').forEach((row) => {
-    const idx = parseInt(row.dataset.segment);
-
-    // Inline edits — active checkbox + sentido input
-    const chk = row.querySelector('[data-active]');
-    if (chk) chk.addEventListener('change', (ev) => {
-      getOverride(recId, idx).active = ev.target.checked;
-      row.style.opacity = ev.target.checked ? '' : '0.45';
-    });
-    if (chk && !chk.checked) row.style.opacity = '0.45';
-
-    const sent = row.querySelector('[data-sentido]');
-    if (sent) sent.addEventListener('input', (ev) => {
-      getOverride(recId, idx).sentido = ev.target.value;
-    });
-
-    // Row hover / click interactions — guard so that clicks on the
-    // editable cells don't bubble into "zoom to segment".
-    row.addEventListener('mouseenter', () => {
-      highlightSegment(idx);
-      row.classList.add('highlighted');
-    });
-    row.addEventListener('mouseleave', () => {
-      unhighlightSegment(idx);
-      row.classList.remove('highlighted');
-    });
-    row.addEventListener('click', (ev) => {
-      if (ev.target.closest('input')) return;
-      if (segmentLayers[idx]) {
-        map.fitBounds(segmentLayers[idx].getBounds(), { padding: [60, 60] });
-      }
-    });
-  });
-}
+// Visual-only: the tab's interactive table now lives in renderSubtramosTable().
+// Kept as a stub so processSegmentation() (map preview) can still call it
+// without a separate code path.
+function renderSegmentsTable(/* segments */) { /* no-op */ }
 
 function highlightSegment(index) {
   segmentLayers.forEach((layer, i) => {
@@ -1120,18 +1072,9 @@ function unhighlightSegment() {
   });
 }
 
-// ── Summary ──────────────────────────────────────────────────
-function showSegmentsSummary(segments) {
-  el.segmentsSummary.style.display = 'block';
-  el.summarySegments.textContent = segments.length;
-
-  const totalDist = segments.reduce((sum, s) => sum + s.distance, 0);
-  el.summaryDistance.textContent = (totalDist / 1000).toFixed(2);
-
-  const totalTime = segments.reduce((sum, s) => sum + s.time, 0);
-  const overallAvg = totalTime > 0 ? (totalDist / 1000) / (totalTime / 3600) : 0;
-  el.summaryAvgSpeed.textContent = formatSpeed(overallAvg);
-}
+// Summary was removed from the HTML (the segments tab now hosts the
+// global subtramos editor) — keep the call site harmless.
+function showSegmentsSummary(/* segments */) { /* no-op */ }
 
 // ── Legend ────────────────────────────────────────────────────
 function renderLegend(segments) {
@@ -1183,9 +1126,6 @@ function clearSegments() {
   segmentResults = [];
   matchResults = [];
   clearSegmentLayers();
-  el.segmentsTable.classList.add('hidden');
-  el.noSegments.classList.remove('hidden');
-  el.segmentsSummary.style.display = 'none';
   el.mapLegend.innerHTML = '';
 }
 
@@ -1211,6 +1151,123 @@ function showToast(message, type = 'info') {
   }, 3000);
 }
 
+// ── Subtramos editor (global list, shared across recorridos) ──
+const START_NODE_ID = '__start__';
+const END_NODE_ID   = '__end__';
+
+function newSubtramoId() {
+  return `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function addSubtramo(initial = {}) {
+  subtramos.push({
+    id:          newSubtramoId(),
+    active:      true,
+    startNodeId: START_NODE_ID,
+    endNodeId:   END_NODE_ID,
+    sentido:     '',
+    ...initial,
+  });
+}
+
+function clearSubtramos() {
+  if (!subtramos.length) return;
+  if (!confirm(`¿Vaciar los ${subtramos.length} subtramos definidos?`)) return;
+  subtramos = [];
+  renderSubtramosTable();
+}
+
+// Populate `subtramos` from the nodes the active recorrido actually crosses,
+// in the order they appear. Useful to kick-start the list.
+function autoDetectSubtramos() {
+  if (!activeRecorridoId) { showToast('Selecciona un recorrido activo primero.', 'warning'); return; }
+  if (!referenceNodes.length) { showToast('Carga los puntos de control primero.', 'warning'); return; }
+  const rec = recorridos.find((r) => r.id === activeRecorridoId);
+  if (!rec) return;
+
+  const threshold = parseFloat(el.thresholdInput.value) || 50;
+  // Build the ordered sequence of node crossings along the track.
+  const events = [];
+  for (const n of referenceNodes) {
+    for (const c of findNodeCrossings(n, rec.points, threshold)) {
+      events.push({ trackIndex: c.trackIndex, nodeId: n.id });
+    }
+  }
+  events.sort((a, b) => a.trackIndex - b.trackIndex);
+
+  if (!events.length) {
+    showToast('Ningún nodo dentro del umbral. Aumenta el umbral y reintenta.', 'warning');
+    return;
+  }
+
+  const fresh = [];
+  // Inicio → primer cruce
+  fresh.push({ id: newSubtramoId(), active: true, startNodeId: START_NODE_ID, endNodeId: events[0].nodeId, sentido: '' });
+  // Entre cruces consecutivos
+  for (let i = 1; i < events.length; i++) {
+    fresh.push({ id: newSubtramoId(), active: true, startNodeId: events[i - 1].nodeId, endNodeId: events[i].nodeId, sentido: '' });
+  }
+  // Último cruce → Fin
+  fresh.push({ id: newSubtramoId(), active: true, startNodeId: events[events.length - 1].nodeId, endNodeId: END_NODE_ID, sentido: '' });
+
+  subtramos = fresh;
+  renderSubtramosTable();
+  showToast(`Detectados ${fresh.length} subtramos. Ajusta/desactiva los que no necesites.`, 'success');
+}
+
+function nodeOptionsHtml(selectedId) {
+  const opts = [
+    `<option value="${START_NODE_ID}"${selectedId === START_NODE_ID ? ' selected' : ''}>Inicio</option>`,
+    `<option value="${END_NODE_ID}"${selectedId === END_NODE_ID ? ' selected' : ''}>Fin</option>`,
+  ];
+  for (const n of referenceNodes) {
+    const sel = n.id === selectedId ? ' selected' : '';
+    opts.push(`<option value="${n.id}"${sel}>${escapeHtml(n.name)}</option>`);
+  }
+  return opts.join('');
+}
+
+function renderSubtramosTable() {
+  if (!subtramos.length) {
+    el.subtramosTable.classList.add('hidden');
+    el.noSubtramos.classList.remove('hidden');
+    el.subtramosBody.innerHTML = '';
+    return;
+  }
+  el.noSubtramos.classList.add('hidden');
+  el.subtramosTable.classList.remove('hidden');
+
+  el.subtramosBody.innerHTML = subtramos.map((st, i) => {
+    const rowStyle = st.active ? '' : 'opacity:0.45;';
+    return `
+    <tr data-id="${st.id}" style="${rowStyle}">
+      <td style="text-align:center;"><input type="checkbox" data-active ${st.active ? 'checked' : ''}></td>
+      <td>${i + 1}</td>
+      <td><select data-start class="form-input" style="padding:4px 6px;font-size:12px;">${nodeOptionsHtml(st.startNodeId)}</select></td>
+      <td><select data-end class="form-input" style="padding:4px 6px;font-size:12px;">${nodeOptionsHtml(st.endNodeId)}</select></td>
+      <td><input type="text" class="form-input" data-sentido value="${escapeHtml(st.sentido || '')}" placeholder="S - N" style="padding:4px 6px;font-size:12px;min-width:72px;"></td>
+      <td><button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button></td>
+    </tr>`;
+  }).join('');
+
+  el.subtramosBody.querySelectorAll('tr').forEach((row) => {
+    const st = subtramos.find((s) => s.id === row.dataset.id);
+    if (!st) return;
+
+    row.querySelector('[data-active]').addEventListener('change', (ev) => {
+      st.active = ev.target.checked;
+      row.style.opacity = st.active ? '' : '0.45';
+    });
+    row.querySelector('[data-start]').addEventListener('change', (ev) => { st.startNodeId = ev.target.value; });
+    row.querySelector('[data-end]').addEventListener('change',   (ev) => { st.endNodeId   = ev.target.value; });
+    row.querySelector('[data-sentido]').addEventListener('input', (ev) => { st.sentido    = ev.target.value; });
+    row.querySelector('[data-remove]').addEventListener('click', () => {
+      subtramos = subtramos.filter((s) => s.id !== st.id);
+      renderSubtramosTable();
+    });
+  });
+}
+
 // ── Excel export ─────────────────────────────────────────────
 function fechaLargaEs(ts) {
   if (!ts) return '';
@@ -1225,19 +1282,65 @@ function diaClasificacion(ts) {
   return (dow === 0 || dow === 6) ? 'ATIPICO' : 'TIPICO';
 }
 
+function resolveNodeName(nodeId) {
+  if (nodeId === START_NODE_ID) return 'Inicio';
+  if (nodeId === END_NODE_ID)   return 'Fin';
+  const n = referenceNodes.find((x) => x.id === nodeId);
+  return n ? n.name : '(nodo)';
+}
+
+// For one recorrido, walk its track advancing a cursor through the list
+// of active subtramos. That way "CL53 → CL24" and "CL24 → CL53" in the
+// same recorrido pick up different crossings of the same nodes.
+function subtramoRowsForRecorrido(rec, threshold) {
+  const crossingsByNode = new Map();
+  for (const n of referenceNodes) {
+    crossingsByNode.set(n.id, findNodeCrossings(n, rec.points, threshold));
+  }
+
+  const resolveIdx = (nodeId, afterIdx) => {
+    if (nodeId === START_NODE_ID) return 0;
+    if (nodeId === END_NODE_ID)   return rec.points.length - 1;
+    const list = crossingsByNode.get(nodeId) || [];
+    const hit = list.find((c) => c.trackIndex > afterIdx);
+    return hit ? hit.trackIndex : -1;
+  };
+
+  const out = [];
+  let cursor = -1;
+  for (const st of subtramos) {
+    if (!st.active) continue;
+    const startIdx = resolveIdx(st.startNodeId, cursor);
+    if (startIdx < 0) continue;
+    const endIdx = resolveIdx(st.endNodeId, startIdx);
+    if (endIdx < 0 || endIdx <= startIdx) continue;
+
+    const segPoints = rec.points.slice(startIdx, endIdx + 1);
+    if (segPoints.length < 2) continue;
+    const metrics = segmentMetrics(segPoints);
+
+    out.push({
+      subtramo: st,
+      startIdx,
+      endIdx,
+      firstPointTime: segPoints[0].timestamp,
+      lastPointTime:  segPoints[segPoints.length - 1].timestamp,
+      distance: metrics.distance,
+      time:     metrics.time,
+      avgSpeed: metrics.avgSpeed,
+    });
+    cursor = endIdx;
+  }
+  return out;
+}
+
 function exportExcel() {
   if (typeof XLSX === 'undefined') {
     showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
     return;
   }
-  if (!recorridos.length) {
-    showToast('Carga al menos un recorrido antes de exportar.', 'warning');
-    return;
-  }
-  if (!referenceNodes.length) {
-    showToast('Carga los puntos de control antes de exportar.', 'warning');
-    return;
-  }
+  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
+  if (!subtramos.length)  { showToast('Define al menos un subtramo en la pestaña Tramos.', 'warning'); return; }
 
   const threshold = parseFloat(el.thresholdInput.value) || 50;
   const study = {
@@ -1250,32 +1353,29 @@ function exportExcel() {
   const rows = [];
   recorridos.forEach((rec, ri) => {
     const consecutivo = ri + 1;
-    const { results } = runSegmentationOn(rec.points, threshold);
-    const overrides = segmentOverrides[rec.id] || {};
-    results.forEach((seg, i) => {
-      const ov = overrides[i] || { active: true, sentido: '' };
-      if (!ov.active) return;
+    const hits = subtramoRowsForRecorrido(rec, threshold);
+    for (const h of hits) {
       rows.push({
-        'DÍA':           diaClasificacion(rec.startTs),
-        'FECHA':         fechaLargaEs(rec.startTs),
-        'PERIODO':       study.periodo,
-        'LINK':          rec.sourceUrl || '',
-        'CORREDOR':      study.corredor,
-        'TRAMO':         `${seg.startNode} - ${seg.endNode}`,
-        'CALZADA':       study.calzada,
-        'RECORRIDO':     consecutivo,
-        'SENTIDO':       ov.sentido || '',
-        'HORA DE INICIO': formatClock(seg.firstPointTime),
-        'HORA LLEGADA':   formatClock(seg.lastPointTime),
-        'DISTANCIA':     +(seg.distance / 1000).toFixed(4),
-        'TIEMPO HORA':   +(seg.time / 3600).toFixed(4),
-        'VELOCIDAD':     +Number(seg.avgSpeed || 0).toFixed(2),
+        'DÍA':            diaClasificacion(rec.startTs),
+        'FECHA':          fechaLargaEs(rec.startTs),
+        'PERIODO':        study.periodo,
+        'LINK':           rec.sourceUrl || '',
+        'CORREDOR':       study.corredor,
+        'TRAMO':          `${resolveNodeName(h.subtramo.startNodeId)} - ${resolveNodeName(h.subtramo.endNodeId)}`,
+        'CALZADA':        study.calzada,
+        'RECORRIDO':      consecutivo,
+        'SENTIDO':        h.subtramo.sentido || '',
+        'HORA DE INICIO': formatClock(h.firstPointTime),
+        'HORA LLEGADA':   formatClock(h.lastPointTime),
+        'DISTANCIA':      +(h.distance / 1000).toFixed(4),
+        'TIEMPO HORA':    +(h.time / 3600).toFixed(4),
+        'VELOCIDAD':      +Number(h.avgSpeed || 0).toFixed(2),
       });
-    });
+    }
   });
 
   if (!rows.length) {
-    showToast('No hay tramos activos para exportar. Verifica los puntos de control y los checkboxes.', 'warning');
+    showToast('Ningún subtramo activo pudo matchearse con los recorridos cargados. Revisa nodos y umbral.', 'warning');
     return;
   }
 

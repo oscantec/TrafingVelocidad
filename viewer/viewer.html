@@ -731,56 +731,45 @@
           </div>
         </div>
 
-        <!-- Tab: Segments Results -->
+        <!-- Tab: Subtramos definition (global, shared across recorridos) -->
         <div class="tab-content" id="tab-segments">
-          <div class="viewer-panel-section" id="segmentsSummary" style="display:none;">
+          <div class="viewer-panel-section">
             <div class="section-header">
-              <h2>Resumen general</h2>
+              <h2>Subtramos</h2>
             </div>
-            <div class="summary-metrics">
-              <div class="summary-metric">
-                <div class="label">Tramos</div>
-                <div class="value" id="summarySegments">—</div>
-              </div>
-              <div class="summary-metric">
-                <div class="label">Dist. total</div>
-                <div class="value" id="summaryDistance">—</div>
-                <div class="unit">km</div>
-              </div>
-              <div class="summary-metric">
-                <div class="label">Vel. media</div>
-                <div class="value" id="summaryAvgSpeed">—</div>
-                <div class="unit">km/h</div>
-              </div>
+            <p class="text-xs text-muted" style="margin-bottom:10px;line-height:1.5;">
+              Define los subtramos una sola vez. Aplican a todos los recorridos cargados.
+              Solo los marcados como <strong>Activos</strong> se incluyen en el Excel.
+            </p>
+            <div class="btn-group" style="margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+              <button class="btn btn-sm btn-secondary" id="btnAddSubtramo">+ Añadir subtramo</button>
+              <button class="btn btn-sm btn-secondary" id="btnAutoSubtramos" title="Detecta la secuencia de nodos que cruza el recorrido activo y rellena esta lista">Auto desde recorrido activo</button>
+              <button class="btn btn-sm btn-danger"    id="btnClearSubtramos" title="Vaciar la lista">Vaciar</button>
             </div>
-            <div class="process-actions" style="margin-top:12px;">
+
+            <div class="segments-table-wrap">
+              <div id="noSubtramos" class="empty-state">
+                <h3>Sin subtramos</h3>
+                <p>Usa "+ Añadir subtramo" o "Auto desde recorrido activo" para empezar.</p>
+              </div>
+              <table class="data-table hidden" id="subtramosTable">
+                <thead>
+                  <tr>
+                    <th title="Incluir en el Excel">Activo</th>
+                    <th>#</th>
+                    <th>Nodo inicio</th>
+                    <th>Nodo fin</th>
+                    <th>Sentido</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="subtramosBody"></tbody>
+              </table>
+            </div>
+
+            <div class="process-actions" style="margin-top:14px;">
               <button class="btn btn-primary w-full" id="btnExportExcel">Exportar a Excel</button>
             </div>
-          </div>
-
-          <div class="segments-table-wrap">
-            <div id="noSegments" class="empty-state">
-              <h3>Sin tramos</h3>
-              <p>Carga un track y puntos de control, luego presiona "Segmentar track".</p>
-            </div>
-
-            <table class="data-table hidden" id="segmentsTable">
-              <thead>
-                <tr>
-                  <th title="Incluir en el Excel">Activo</th>
-                  <th>#</th>
-                  <th>Nodo inicio</th>
-                  <th>Nodo fin</th>
-                  <th>Sentido</th>
-                  <th>H. inicio</th>
-                  <th>H. llegada</th>
-                  <th>Distancia</th>
-                  <th>Tiempo</th>
-                  <th>Vel. media</th>
-                </tr>
-              </thead>
-              <tbody id="segmentsBody"></tbody>
-            </table>
           </div>
         </div>
       </div>
