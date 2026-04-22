@@ -322,24 +322,40 @@ async function handleTrackUrlImport() {
   try {
     el.btnLoadUrl.disabled = true;
     el.btnLoadUrl.textContent = '…';
-    const resp = await fetch(url, { mode: 'cors' });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const text = await resp.text();
+    const text = await fetchUrlWithFallback(url);
     const { name, points } = parseTrackContent(text, url);
     addRecorrido({ name: name || url, points });
     el.trackUrlInput.value = '';
     showToast(`URL importada (${name}): ${points.length} puntos`, 'success');
   } catch (err) {
     console.error('[Viewer] URL import error:', err);
-    const msg = String(err.message || err);
-    if (msg.includes('Failed to fetch') || msg.includes('CORS') || msg.includes('NetworkError')) {
-      showToast('El servidor bloquea acceso cruzado (CORS). Descarga el archivo y súbelo o pégalo.', 'error', 6500);
-    } else {
-      showToast(`Error: ${msg}`, 'error', 6000);
-    }
+    showToast(`Error: ${String(err.message || err)}`, 'error', 6000);
   } finally {
     el.btnLoadUrl.disabled = false;
     el.btnLoadUrl.textContent = '↓';
+  }
+}
+
+// Fetch a URL directly; if the browser blocks it (CORS / network),
+// retry through the /api/fetch serverless proxy which runs server-side.
+async function fetchUrlWithFallback(url) {
+  try {
+    const resp = await fetch(url, { mode: 'cors' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return await resp.text();
+  } catch (err) {
+    const msg = String(err.message || err);
+    const likelyCors = msg.includes('Failed to fetch')
+      || msg.includes('CORS')
+      || msg.includes('NetworkError');
+    if (!likelyCors) throw err;
+    const proxied = await fetch(`/api/fetch?url=${encodeURIComponent(url)}`);
+    if (!proxied.ok) {
+      let detail = '';
+      try { detail = (await proxied.json())?.error || ''; } catch {}
+      throw new Error(`Proxy HTTP ${proxied.status}${detail ? ` — ${detail}` : ''}`);
+    }
+    return await proxied.text();
   }
 }
 
