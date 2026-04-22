@@ -13,6 +13,7 @@ import {
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, listControlPointsByTramo,
+         listSubtramosByTramo,
          saveTramoComplete, deleteTramo } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
@@ -506,17 +507,33 @@ create table if not exists public.control_points (
   created_at timestamptz default now()
 );
 
+create table if not exists public.subtramos (
+  id         uuid primary key default gen_random_uuid(),
+  tramo_id   uuid not null references public.tramos(id) on delete cascade,
+  seq        integer not null default 0,
+  active     boolean not null default true,
+  -- start_ref / end_ref are either the string '__start__', '__end__'
+  -- or the uuid of a row in control_points. Kept as text for simplicity.
+  start_ref  text not null,
+  end_ref    text not null,
+  sentido    text,
+  created_at timestamptz default now()
+);
+
 alter table public.corridors      enable row level security;
 alter table public.tramos         enable row level security;
 alter table public.control_points enable row level security;
+alter table public.subtramos      enable row level security;
 
 drop policy if exists "anon all corridors"      on public.corridors;
 drop policy if exists "anon all tramos"         on public.tramos;
 drop policy if exists "anon all control_points" on public.control_points;
+drop policy if exists "anon all subtramos"      on public.subtramos;
 
 create policy "anon all corridors"      on public.corridors      for all using (true) with check (true);
 create policy "anon all tramos"         on public.tramos         for all using (true) with check (true);
-create policy "anon all control_points" on public.control_points for all using (true) with check (true);`;
+create policy "anon all control_points" on public.control_points for all using (true) with check (true);
+create policy "anon all subtramos"      on public.subtramos      for all using (true) with check (true);`;
 
 async function refreshTramos() {
   const [tRes, cRes] = await Promise.all([listTramos(), listCorridors()]);
@@ -572,9 +589,24 @@ async function handleTramoSelect() {
   displayNodes(nodes);
   drawNodeMarkers(nodes);
   updateProcessButton();
+
+  // Also try to restore the subtramos previously saved for this tramo.
+  const stRes = await listSubtramosByTramo(tramoId);
+  if (stRes.ok && stRes.subtramos.length) {
+    subtramos = stRes.subtramos.map((row) => ({
+      id:          row.id,
+      active:      row.active !== false,
+      startNodeId: row.start_ref,
+      endNodeId:   row.end_ref,
+      sentido:     row.sentido || '',
+    }));
+    renderSubtramosTable();
+  }
+
   const tramo = tramosCache.find((t) => t.id === tramoId);
   const label = tramo ? `${tramo.corridors?.name || ''} / ${tramo.name}` : 'tramo';
-  showToast(`Cargados ${nodes.length} puntos de "${label}"`, 'success');
+  const extra = stRes.ok && stRes.subtramos.length ? ` y ${stRes.subtramos.length} subtramo(s)` : '';
+  showToast(`Cargados ${nodes.length} punto(s)${extra} de "${label}"`, 'success');
   el.savedTramoSelect.value = '';
 }
 
@@ -754,7 +786,10 @@ async function handleSaveTramoSubmit() {
     corridorId,
     corridorName,
     tramoName,
-    points: referenceNodes.map((n) => ({ name: n.name, lat: +n.lat, lng: +n.lng })),
+    // Include local id so the backend can map subtramos' startNodeId/endNodeId
+    // (which point to these local ids) to the freshly-inserted cloud uuids.
+    points: referenceNodes.map((n) => ({ id: n.id, name: n.name, lat: +n.lat, lng: +n.lng })),
+    subtramos,
   });
 
   el.stSave.disabled = false;

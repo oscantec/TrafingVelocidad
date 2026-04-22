@@ -431,12 +431,17 @@
     .pb-stat-bar  { height: 3px; background: var(--ui-line-soft); border-radius: 99px; overflow: hidden; margin-top: 2px; }
     .pb-stat-bar-fill { height: 100%; width: 0%; background: var(--ui-orange); border-radius: 99px; transition: width 0.3s ease; }
 
+    /* Chart breaks out of the panel's horizontal padding so it
+       really spans the full width of the right column. */
     .pb-chart {
-      position: relative; width: 100%; height: 140px;
+      position: relative;
+      width: calc(100% + 2 * var(--ui-sp-5));
+      margin-left: calc(-1 * var(--ui-sp-5));
+      height: 150px;
       background: var(--ui-bg);
-      border: 1px solid var(--ui-line);
-      border-radius: var(--ui-r);
-      padding: 8px 12px;
+      border-top: 1px solid var(--ui-line);
+      border-bottom: 1px solid var(--ui-line);
+      padding: 6px 12px;
     }
     .pb-chart canvas { width: 100% !important; height: 100% !important; }
 
@@ -640,7 +645,6 @@
                 <button class="btn btn-sm btn-secondary" id="btnClearNodes">Vaciar</button>
               </div>
               <div class="nodes-list" id="nodesList"></div>
-              <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:10px;">Guardar tramo</button>
             </div>
           </div>
 
@@ -680,6 +684,8 @@
               <span class="text-xs text-muted">metros</span>
             </div>
             <button class="btn btn-sm btn-secondary w-full hidden" id="btnProcess" style="margin-top:10px;">Segmentar track</button>
+
+            <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:16px;">Guardar tramo + subtramos</button>
           </div>
         </div>
 
