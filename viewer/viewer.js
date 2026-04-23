@@ -671,15 +671,12 @@ function handleMapClickForDrawing(e) {
 
 function openNodeNamePopup(latlng, defaultName) {
   const html = `
-    <div style="min-width:200px;">
-      <div style="font-size:11px;color:#475569;margin-bottom:4px;font-weight:600;">
-        ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}
-      </div>
-      <input id="np-name" type="text" value="${defaultName}" autocomplete="off"
-             style="width:100%;padding:6px 8px;border:1px solid #E4E8EE;border-radius:6px;font-size:13px;margin-bottom:6px;box-sizing:border-box;">
-      <div style="display:flex;gap:6px;">
-        <button id="np-save" style="flex:1;padding:6px 10px;background:#F05A1A;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Añadir</button>
-        <button id="np-cancel" style="padding:6px 10px;background:#F8FAFC;color:#475569;border:1px solid #E4E8EE;border-radius:6px;cursor:pointer;">Cancelar</button>
+    <div class="map-popup">
+      <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
+      <input id="np-name" class="form-input" type="text" value="${defaultName}" autocomplete="off">
+      <div class="map-popup-actions">
+        <button id="np-save"   class="btn btn-sm btn-primary">Añadir</button>
+        <button id="np-cancel" class="btn btn-sm btn-secondary">Cancelar</button>
       </div>
     </div>`;
 
@@ -1067,15 +1064,16 @@ function renderSegmentsOnMap(segments) {
 
     // Popup with metrics
     polyline.bindPopup(`
-      <div style="font-family:var(--font-mono,'monospace');font-size:11px;line-height:1.6;">
-        <strong>Tramo ${seg.index}</strong><br>
-        ${seg.startNode} → ${seg.endNode}<br>
-        ───────────<br>
-        Distancia: ${formatDistance(seg.distance)}<br>
-        Tiempo: ${formatDuration(seg.time)}<br>
-        Vel. Media: ${formatSpeed(seg.avgSpeed)} km/h<br>
-        Vel. Máx: ${formatSpeed(seg.maxSpeed)} km/h<br>
-        Puntos: ${seg.pointCount}
+      <div class="map-popup map-popup-readout">
+        <div class="map-popup-title">Tramo ${seg.index}</div>
+        <div class="map-popup-sub">${seg.startNode} → ${seg.endNode}</div>
+        <dl class="map-popup-list">
+          <dt>Distancia</dt><dd>${formatDistance(seg.distance)}</dd>
+          <dt>Tiempo</dt><dd>${formatDuration(seg.time)}</dd>
+          <dt>Vel. media</dt><dd>${formatSpeed(seg.avgSpeed)} km/h</dd>
+          <dt>Vel. máx</dt><dd>${formatSpeed(seg.maxSpeed)} km/h</dd>
+          <dt>Puntos</dt><dd>${seg.pointCount}</dd>
+        </dl>
       </div>
     `);
 

@@ -54,6 +54,8 @@
       --ui-orange:     #F05A1A;
       --ui-orange-soft:#FFF1E8;
       --ui-navy:       #1F3864;
+      --ui-success:    #16A34A;
+      --ui-warn:       #D97706;
 
       --ui-sp-1: 4px; --ui-sp-2: 8px; --ui-sp-3: 12px;
       --ui-sp-4: 16px; --ui-sp-5: 20px; --ui-sp-6: 24px;
@@ -283,7 +285,7 @@
       border-color: var(--ui-orange);
       box-shadow: 0 0 0 2px var(--ui-orange-soft);
     }
-    .rec-item.active .rec-classify select { background: #fff; }
+    .rec-item.active .rec-classify select { background: var(--ui-bg); }
     .rec-item .rec-actions {
       display: flex; flex-direction: column; gap: var(--ui-sp-2);
       flex-shrink: 0; justify-content: center; align-items: stretch;
@@ -302,8 +304,8 @@
     .node-item .node-name   { font-size: var(--fs-body); font-weight: 600; color: var(--ui-ink); }
     .node-item .node-coords { display: block; font-size: var(--fs-meta); color: var(--ui-ink-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
     .node-item .node-dist   { font-size: var(--fs-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
-    .node-item .node-dist.near { color: #16A34A; }
-    .node-item .node-dist.far  { color: #D97706; }
+    .node-item .node-dist.near { color: var(--ui-success); }
+    .node-item .node-dist.far  { color: var(--ui-warn); }
     .node-flag {
       display: inline-block; margin-left: 6px;
       padding: 1px 7px; border-radius: 999px;
@@ -534,14 +536,19 @@
     }
     .pb-point-info strong { color: var(--ui-ink); font-weight: 600; }
 
-    .pb-transport { display: flex; align-items: center; gap: 10px; }
+    .pb-transport { display: flex; align-items: center; gap: var(--ui-sp-2); }
+
+    /* Playback controls use the same foundation as .btn — rectangular,
+       same corner radius, same height, same border. The play button is
+       just the .btn-primary variant (orange); pause/stop are the neutral
+       variant; active states swap to success/warn tokens. */
     .pb-speed {
-      height: var(--h-ctl); padding: 0 14px;
+      height: var(--h-ctl); padding: 0 12px;
       background: var(--ui-bg);
       border: 1px solid var(--ui-line);
-      border-radius: 999px;
+      border-radius: var(--ui-r-sm);
       font-family: inherit;
-      font-size: var(--fs-body); font-weight: 600;
+      font-size: var(--fs-body); font-weight: 500;
       color: var(--ui-ink);
       cursor: pointer;
     }
@@ -553,24 +560,63 @@
       background: var(--ui-bg);
       color: var(--ui-ink-2);
       border: 1px solid var(--ui-line);
-      border-radius: 50%;
+      border-radius: var(--ui-r-sm);
       cursor: pointer;
       transition: all 0.15s ease;
     }
     .pb-icon:hover:not(:disabled) { background: var(--ui-bg-alt); color: var(--ui-ink); border-color: var(--ui-ink-3); }
     .pb-icon:disabled { opacity: 0.35; cursor: not-allowed; }
     .pb-icon-play {
-      width: 40px; height: 40px;
       background: var(--ui-orange);
       color: #fff;
       border-color: var(--ui-orange);
     }
     .pb-icon-play:hover:not(:disabled) { filter: brightness(0.95); }
-    .pb-icon-play.active  { background: #16A34A; border-color: #16A34A; }
-    .pb-icon-pause.active { background: #D97706; color: #fff; border-color: #D97706; }
+    .pb-icon-play.active  { background: var(--ui-success); border-color: var(--ui-success); }
+    .pb-icon-pause.active { background: var(--ui-warn); color: #fff; border-color: var(--ui-warn); }
 
     /* map legend */
     .map-legend { position: absolute; bottom: 16px; left: 16px; z-index: 1000; }
+
+    /* Leaflet popup — reuses the same design tokens as the side panel. */
+    .map-popup { min-width: 220px; font-family: inherit; }
+    .map-popup-coords {
+      font-size: var(--fs-meta); font-weight: 500;
+      color: var(--ui-ink-3);
+      margin-bottom: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+    .map-popup .form-input { margin-bottom: var(--ui-sp-2); }
+    .map-popup-actions { display: flex; gap: var(--ui-sp-2); }
+    .map-popup-actions .btn { flex: 1; }
+
+    /* readout variant (segment polyline popup) — definition list layout */
+    .map-popup-readout { min-width: 200px; }
+    .map-popup-title {
+      font-size: var(--fs-body); font-weight: 700;
+      color: var(--ui-ink);
+    }
+    .map-popup-sub {
+      font-size: var(--fs-meta); color: var(--ui-ink-3);
+      margin-top: 2px;
+    }
+    .map-popup-list {
+      margin: 8px 0 0;
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 3px 10px;
+      font-size: var(--fs-meta);
+    }
+    .map-popup-list dt {
+      color: var(--ui-ink-3); font-weight: 500;
+      text-transform: uppercase; letter-spacing: var(--ls-label);
+      font-size: 10px;
+      align-self: center;
+    }
+    .map-popup-list dd {
+      margin: 0; color: var(--ui-ink); font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
 
     /* responsive */
     @media (max-width: 900px) {
