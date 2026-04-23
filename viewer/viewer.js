@@ -44,6 +44,8 @@ const $ = (id) => document.getElementById(id);
 
 const el = {
   trackFileInput: $('trackFileInput'),
+  filePickerLabel: $('filePickerLabel'),
+  btnLoadFiles:   $('btnLoadFiles'),
   trackUrlInput: $('trackUrlInput'),
   btnLoadUrl: $('btnLoadUrl'),
   cloudTrackSelect: $('cloudTrackSelect'),
@@ -148,8 +150,27 @@ function initMap() {
 
 // ── Event Binding ────────────────────────────────────────────
 function bindEvents() {
-  // Track from file
+  // Track from file — Cargar abre el picker nativo, el label acepta drop
   if (el.trackFileInput) el.trackFileInput.addEventListener('change', handleTrackFileImport);
+  if (el.btnLoadFiles)   el.btnLoadFiles.addEventListener('click', () => el.trackFileInput?.click());
+  if (el.filePickerLabel) {
+    const label = el.filePickerLabel;
+    const onDragEnter = (e) => { e.preventDefault(); label.classList.add('is-drop'); };
+    const onDragOver  = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
+    const onDragLeave = (e) => { if (e.target === label) label.classList.remove('is-drop'); };
+    const onDrop      = async (e) => {
+      e.preventDefault();
+      label.classList.remove('is-drop');
+      const files = Array.from(e.dataTransfer?.files || []);
+      if (!files.length) return;
+      // Reuse the same import path as the <input change> event
+      await handleTrackFileImport({ target: { files, value: '' } });
+    };
+    label.addEventListener('dragenter', onDragEnter);
+    label.addEventListener('dragover',  onDragOver);
+    label.addEventListener('dragleave', onDragLeave);
+    label.addEventListener('drop',      onDrop);
+  }
 
   // Track from URL
   if (el.btnLoadUrl)     el.btnLoadUrl.addEventListener('click', handleTrackUrlImport);
@@ -300,6 +321,17 @@ async function handleTrackFileImport(event) {
   const files = Array.from(event.target.files || []);
   if (!files.length) return;
 
+  // Show which files are in flight on the picker label
+  if (el.filePickerLabel) {
+    const ph = el.filePickerLabel.querySelector('.file-picker-placeholder');
+    if (ph) {
+      ph.textContent = files.length === 1
+        ? files[0].name
+        : `${files.length} archivos seleccionados`;
+    }
+    el.filePickerLabel.classList.add('has-files');
+  }
+
   let ok = 0, fail = 0;
   for (const file of files) {
     try {
@@ -312,8 +344,14 @@ async function handleTrackFileImport(event) {
       fail++;
     }
   }
-  // Reset so the same files can be re-selected later
-  event.target.value = '';
+  // Reset the native <input> so the same files can be re-picked later
+  if (event.target && 'value' in event.target) event.target.value = '';
+  // Restore the default placeholder after the import settled
+  if (el.filePickerLabel) {
+    const ph = el.filePickerLabel.querySelector('.file-picker-placeholder');
+    if (ph) ph.innerHTML = 'Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong>';
+    el.filePickerLabel.classList.remove('has-files');
+  }
   if (ok) showToast(`Cargado(s) ${ok} recorrido(s)${fail ? ` · ${fail} con error` : ''}`, fail ? 'warning' : 'success');
   else    showToast('No se pudo importar ningún archivo', 'error');
 }
@@ -335,7 +373,7 @@ async function handleTrackUrlImport() {
     showToast(`Error: ${String(err.message || err)}`, 'error', 6000);
   } finally {
     el.btnLoadUrl.disabled = false;
-    el.btnLoadUrl.textContent = '↓';
+    el.btnLoadUrl.textContent = 'Cargar';
   }
 }
 

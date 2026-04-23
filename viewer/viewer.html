@@ -226,20 +226,35 @@
     .track-selector > .form-input,
     .track-selector > input { flex: 1; min-width: 0; }
 
-    /* file drop */
-    .file-input-wrapper {
-      position: relative;
-      border: 1.5px dashed var(--ui-line);
-      border-radius: var(--ui-r);
-      background: var(--ui-bg-alt);
-      padding: var(--ui-sp-4);
-      text-align: center;
-      transition: all 0.15s ease;
+    /* file picker — styled as a .form-input row so it matches URL + Nube.
+       The real <input type="file"> is hidden via .visually-hidden; the
+       .file-picker <label> acts as the visible field and also catches
+       drag&drop (handled in JS). */
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
+      white-space: nowrap; border: 0;
     }
-    .file-input-wrapper:hover { border-color: var(--ui-orange); background: var(--ui-orange-soft); }
-    .file-input-wrapper input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-    .file-input-wrapper .file-label { font-size: var(--fs-meta); color: var(--ui-ink-2); pointer-events: none; }
-    .file-input-wrapper strong { color: var(--ui-orange); font-weight: 700; }
+    .file-picker {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center;
+      padding: 0 12px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .file-picker-placeholder {
+      display: block;
+      width: 100%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: var(--ui-ink-3); font-weight: 500;
+    }
+    .file-picker-placeholder strong { color: var(--ui-orange); font-weight: 700; }
+    .file-picker.has-files .file-picker-placeholder {
+      color: var(--ui-ink);
+    }
+    .file-picker.is-drop { border-color: var(--ui-orange); background: var(--ui-orange-soft); }
 
     /* recorridos list cards */
     .rec-list { display: flex; flex-direction: column; gap: var(--ui-sp-3); }
@@ -758,16 +773,19 @@
 
             <div class="form-group">
               <label class="form-label">Archivo(s)</label>
-              <div class="file-input-wrapper">
-                <input type="file" multiple accept=".gpx,.json,.kml,.geojson,.xml,.jsp,.txt,.html,.htm" id="trackFileInput">
-                <div class="file-label">Arrastra varios <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong></div>
+              <div class="track-selector">
+                <label class="form-input file-picker" id="filePickerLabel" for="trackFileInput">
+                  <span class="file-picker-placeholder">Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong></span>
+                </label>
+                <input type="file" multiple accept=".gpx,.json,.kml,.geojson,.xml,.jsp,.txt,.html,.htm" id="trackFileInput" class="visually-hidden">
+                <button class="btn btn-sm btn-primary" id="btnLoadFiles">Cargar</button>
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">URL</label>
               <div class="track-selector">
-                <input type="url" id="trackUrlInput" class="form-input mono" style="flex:1;" placeholder="https://…/track.gpx">
+                <input type="url" id="trackUrlInput" class="form-input mono" placeholder="https://…/track.gpx">
                 <button class="btn btn-sm btn-primary" id="btnLoadUrl">Cargar</button>
               </div>
             </div>
@@ -775,7 +793,7 @@
             <div class="form-group">
               <label class="form-label">Nube</label>
               <div class="track-selector">
-                <select id="cloudTrackSelect" class="form-input" style="flex:1;">
+                <select id="cloudTrackSelect" class="form-input">
                   <option value="">— Selecciona un recorrido guardado —</option>
                 </select>
                 <button class="btn btn-sm btn-secondary" id="btnRefreshCloud" title="Refrescar lista">↻</button>
