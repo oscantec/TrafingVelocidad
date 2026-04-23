@@ -581,6 +581,60 @@
     .legend-item--base { margin-top: 6px; opacity: 0.55; }
     .legend-line--dashed { background: var(--ui-ink-3); border-top: 1px dashed var(--ui-ink-3); height: 0; }
 
+    /* Modals — align with the viewer token palette (the global styles.css
+       definitions use --surface / --border / --fs-lg; we override here so
+       the dialogs match the rest of the viewer exactly). */
+    .modal {
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r);
+      padding: var(--ui-sp-5);
+      box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+    }
+    .modal-title {
+      font-size: var(--fs-stat); font-weight: 700;
+      color: var(--ui-ink);
+      margin-bottom: var(--ui-sp-3);
+      letter-spacing: -0.01em;
+    }
+    .modal-body {
+      color: var(--ui-ink-2);
+      font-size: var(--fs-body); font-weight: 500;
+      line-height: 1.5;
+      margin-bottom: var(--ui-sp-4);
+    }
+    .modal-body p { margin: 0 0 var(--ui-sp-3); }
+    .modal-body strong { color: var(--ui-ink); font-weight: 700; }
+    .modal-actions { display: flex; gap: var(--ui-sp-2); justify-content: flex-end; }
+    .code-block {
+      background: var(--ui-bg-alt);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      padding: 12px;
+      font-family: 'JetBrains Mono', ui-monospace, monospace;
+      font-size: var(--fs-meta);
+      line-height: 1.5;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: var(--ui-ink);
+      margin: 0;
+    }
+
+    /* Toasts — align with the same token palette. */
+    .toast {
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      font-size: var(--fs-body); font-weight: 500;
+      color: var(--ui-ink);
+      padding: 10px 14px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+    }
+    .toast.toast-success { border-left: 3px solid var(--ui-success); }
+    .toast.toast-warning { border-left: 3px solid var(--ui-warn); }
+    .toast.toast-error   { border-left: 3px solid var(--ui-danger); }
+
     /* Leaflet popup — reuses the same design tokens as the side panel. */
     .map-popup { min-width: 220px; font-family: inherit; }
     .map-popup-coords {
@@ -905,12 +959,12 @@
       <div class="modal" style="max-width:680px;">
         <div class="modal-title">Tablas de tramificación pendientes</div>
         <div class="modal-body">
-          <p style="margin-bottom:12px;">
+          <p>
             Para guardar <strong>Corredores → Tramos → Puntos de control</strong> en la nube
             necesitas crear las tablas en Supabase. Solo el dueño del proyecto puede crear tablas;
             desde la app no es posible. Ejecútalo una vez:
           </p>
-          <pre id="cpSetupSql" style="background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;font-family:var(--font-mono);font-size:11px;max-height:260px;overflow:auto;white-space:pre-wrap;line-height:1.5;"></pre>
+          <pre id="cpSetupSql" class="code-block"></pre>
           <div class="btn-group" style="margin-top:12px;">
             <button class="btn btn-sm btn-primary" id="cpSetupCopy">Copiar SQL</button>
             <a class="btn btn-sm btn-secondary"
