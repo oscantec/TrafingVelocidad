@@ -46,6 +46,9 @@ const el = {
   trackFileInput: $('trackFileInput'),
   trackUrlInput: $('trackUrlInput'),
   btnLoadUrl: $('btnLoadUrl'),
+  cloudTrackSelect: $('cloudTrackSelect'),
+  btnLoadCloud:     $('btnLoadCloud'),
+  btnRefreshCloud:  $('btnRefreshCloud'),
   savedTramoSelect:  $('savedTramoSelect'),
   btnRefreshTramos:  $('btnRefreshTramos'),
   btnDrawPoints:     $('btnDrawPoints'),
@@ -110,6 +113,7 @@ async function init() {
   bindEvents();
   initPlayback(map);
   refreshTramos();
+  refreshCloudTracks();
   renderSubtramosTable();
 }
 
@@ -152,6 +156,10 @@ function bindEvents() {
   if (el.trackUrlInput)  el.trackUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') handleTrackUrlImport();
   });
+
+  // Track from cloud (recorridos guardados desde el módulo Captura)
+  if (el.btnLoadCloud)    el.btnLoadCloud.addEventListener('click', handleCloudImport);
+  if (el.btnRefreshCloud) el.btnRefreshCloud.addEventListener('click', () => refreshCloudTracks({ notify: true }));
 
   // Recorridos list — clear all
   if (el.btnClearRecorridos) el.btnClearRecorridos.addEventListener('click', clearRecorridos);
@@ -328,6 +336,74 @@ async function handleTrackUrlImport() {
   } finally {
     el.btnLoadUrl.disabled = false;
     el.btnLoadUrl.textContent = '↓';
+  }
+}
+
+// ── Cloud import (tracks synced from the Capture module) ─────
+async function refreshCloudTracks({ notify = false } = {}) {
+  if (!el.cloudTrackSelect) return;
+  const sel = el.cloudTrackSelect;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  let tracks = [];
+  try {
+    tracks = await listCloudTracks();
+  } catch (err) {
+    console.warn('[Viewer] cloud list error:', err);
+  }
+  if (!tracks.length) {
+    sel.innerHTML = '<option value="">— Sin recorridos en la nube —</option>';
+    if (notify) showToast('No hay recorridos guardados en la nube', 'warning');
+    return;
+  }
+  const fmt = (iso) => {
+    const t = iso ? new Date(iso) : null;
+    return t && !isNaN(t) ? t.toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  };
+  sel.innerHTML = '<option value="">— Selecciona un recorrido guardado —</option>'
+    + tracks.map((t) => {
+        const name = t.name || 'Recorrido sin nombre';
+        const when = fmt(t.start_time);
+        const pts  = t.point_count ?? '—';
+        return `<option value="${t.id}">${escapeHtml(name)} · ${when} · ${pts} pts</option>`;
+      }).join('');
+  // Preserve the previously selected option when possible.
+  if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  if (notify) showToast(`${tracks.length} recorrido(s) en la nube`, 'success');
+}
+
+async function handleCloudImport() {
+  const sel = el.cloudTrackSelect;
+  const id  = sel?.value;
+  if (!id) { showToast('Selecciona un recorrido de la nube', 'warning'); return; }
+
+  const meta = [...sel.options].find((o) => o.value === id);
+  const label = meta ? meta.textContent.split(' · ')[0] : 'Recorrido';
+
+  try {
+    el.btnLoadCloud.disabled = true;
+    el.btnLoadCloud.textContent = '…';
+    const raw = await getCloudTrackPoints(id);
+    if (!raw || !raw.length) {
+      showToast('Ese recorrido no tiene puntos guardados', 'error');
+      return;
+    }
+    const points = raw.map((p) => ({
+      lat:       Number(p.lat),
+      lng:       Number(p.lng),
+      speed:     p.speed == null ? null : Number(p.speed),
+      accuracy:  p.accuracy == null ? null : Number(p.accuracy),
+      altitude:  p.altitude == null ? null : Number(p.altitude),
+      timestamp: new Date(p.timestamp).getTime(),
+    }));
+    addRecorrido({ name: label, points, sourceUrl: `cloud://${id}` });
+    showToast(`Nube: ${label} · ${points.length} puntos`, 'success');
+  } catch (err) {
+    console.error('[Viewer] cloud import error:', err);
+    showToast(`Error: ${String(err.message || err)}`, 'error', 6000);
+  } finally {
+    el.btnLoadCloud.disabled = false;
+    el.btnLoadCloud.textContent = 'Cargar';
   }
 }
 
