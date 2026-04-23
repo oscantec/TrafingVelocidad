@@ -383,37 +383,39 @@
       transform: rotate(45deg);
     }
 
-    /* preview table (Excel mirror) — shares the same sizes as the subtramos table */
+    /* preview table (Excel mirror) — same visual language as .data-table:
+       gray chip header with the eyebrow label, single bottom border per row,
+       no cell right-borders, no navy band, no zebra. Only difference is the
+       body font is one step smaller (fs-meta instead of fs-body) because the
+       preview carries ~15 columns against the 6 of subtramos. */
     .preview-wrap {
       max-height: calc(100vh - 240px);
       overflow: auto;
       border: 1px solid var(--ui-line);
       border-radius: var(--ui-r);
+      background: var(--ui-bg);
     }
     table.preview-table {
       width: 100%; border-collapse: collapse;
-      font-size: var(--fs-meta); font-family: inherit;
+      font-family: inherit; font-size: var(--fs-meta);
       line-height: 1.35;
     }
     table.preview-table thead th {
-      background: var(--ui-navy); color: #fff;
-      padding: 6px 8px;
-      font-size: 10px; letter-spacing: 0.06em;
-      text-align: center;
-      border-right: 1px solid rgba(255,255,255,0.12);
+      padding: 8px;
+      text-align: left;
+      background: var(--ui-bg-alt);
+      color: var(--ui-ink-3);
+      border-bottom: 1px solid var(--ui-line);
       position: sticky; top: 0;
       white-space: nowrap;
     }
-    table.preview-table thead th:last-child { border-right: none; }
     table.preview-table tbody td {
-      padding: 4px 8px; font-weight: 500;
-      border-right: 1px solid var(--ui-line-soft);
+      padding: 5px 8px; font-weight: 500;
       border-bottom: 1px solid var(--ui-line-soft);
       color: var(--ui-ink);
       white-space: nowrap;
     }
-    table.preview-table tbody tr:nth-child(even) td { background: var(--ui-bg-alt); }
-    table.preview-table tbody tr:nth-child(odd)  td { background: var(--ui-bg); }
+    table.preview-table tbody tr:hover td { background: var(--ui-bg-alt); }
     table.preview-table td.num  { text-align: right; font-variant-numeric: tabular-nums; }
     table.preview-table td.link {
       max-width: 240px; overflow: hidden; text-overflow: ellipsis;
