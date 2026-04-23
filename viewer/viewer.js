@@ -1388,11 +1388,16 @@ function subtramoRowsForRecorrido(rec, threshold) {
     crossingsByNode.set(n.id, findNodeCrossings(n, rec.points, threshold));
   }
 
-  const firstIdxAfter = (nodeId, afterIdx) => {
+  // Accept crossings at OR after the cursor, so two consecutive subtramos
+  // that share the middle node (A→B followed by B→C) can both use the
+  // same B crossing — the first as its endNode, the second as its
+  // startNode. With strict `>` the second subtramo would look for a
+  // fresh B crossing that doesn't exist in that sentido.
+  const firstIdxAtOrAfter = (nodeId, afterIdx) => {
     if (nodeId === START_NODE_ID) return 0;
     if (nodeId === END_NODE_ID)   return rec.points.length - 1;
     const list = crossingsByNode.get(nodeId) || [];
-    const hit = list.find((c) => c.trackIndex > afterIdx);
+    const hit = list.find((c) => c.trackIndex >= afterIdx);
     return hit ? hit.trackIndex : -1;
   };
 
@@ -1401,13 +1406,13 @@ function subtramoRowsForRecorrido(rec, threshold) {
   // grazes the threshold disc, drifts out, and then passes much closer
   // moments later should report the closer (later) approach — that is
   // the real "paso por el nodo" the operator measures by eye.
-  const lastIdxBefore = (nodeId, afterIdx, beforeIdx) => {
+  const lastIdxBetween = (nodeId, afterIdx, beforeIdx) => {
     if (nodeId === START_NODE_ID) return 0;
     if (nodeId === END_NODE_ID)   return rec.points.length - 1;
     const list = crossingsByNode.get(nodeId) || [];
     let pick = -1;
     for (const c of list) {
-      if (c.trackIndex <= afterIdx) continue;
+      if (c.trackIndex < afterIdx) continue;
       if (c.trackIndex >= beforeIdx) break;
       pick = c.trackIndex;
     }
@@ -1421,15 +1426,17 @@ function subtramoRowsForRecorrido(rec, threshold) {
   // is emitted anyway with empty times and zeroed metrics so the operator
   // sees that the subtramo existed in the definition but no se recorrió.
   const out = [];
-  let cursor = -1;
+  let cursor = 0;
   for (const st of subtramos) {
     if (!st.active) continue;
 
-    const tentativeEndIdx = firstIdxAfter(st.endNodeId, cursor);
+    const tentativeEndIdx = firstIdxAtOrAfter(st.endNodeId, cursor);
     const startIdx = tentativeEndIdx >= 0
-      ? lastIdxBefore(st.startNodeId, cursor, tentativeEndIdx)
+      ? lastIdxBetween(st.startNodeId, cursor, tentativeEndIdx + 1)
       : -1;
-    const endIdx = startIdx >= 0 ? firstIdxAfter(st.endNodeId, startIdx) : -1;
+    // endIdx must land strictly after startIdx so the two cruces are
+    // distinct points (the subtramo tiene duración > 0).
+    const endIdx = startIdx >= 0 ? firstIdxAtOrAfter(st.endNodeId, startIdx + 1) : -1;
     const hasMatch = startIdx >= 0 && endIdx > startIdx;
 
     if (hasMatch) {
