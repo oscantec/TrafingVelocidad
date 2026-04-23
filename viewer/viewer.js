@@ -1368,7 +1368,7 @@ function subtramoRowsForRecorrido(rec, threshold) {
     crossingsByNode.set(n.id, findNodeCrossings(n, rec.points, threshold));
   }
 
-  const resolveIdx = (nodeId, afterIdx) => {
+  const firstIdxAfter = (nodeId, afterIdx) => {
     if (nodeId === START_NODE_ID) return 0;
     if (nodeId === END_NODE_ID)   return rec.points.length - 1;
     const list = crossingsByNode.get(nodeId) || [];
@@ -1376,13 +1376,33 @@ function subtramoRowsForRecorrido(rec, threshold) {
     return hit ? hit.trackIndex : -1;
   };
 
+  // For the subtramo's START we want the LAST near-pass to the start
+  // node before the vehicle commits to the end node. A recorrido that
+  // grazes the threshold disc, drifts out, and then passes much closer
+  // moments later should report the closer (later) approach — that is
+  // the real "paso por el nodo" the operator measures by eye.
+  const lastIdxBefore = (nodeId, afterIdx, beforeIdx) => {
+    if (nodeId === START_NODE_ID) return 0;
+    if (nodeId === END_NODE_ID)   return rec.points.length - 1;
+    const list = crossingsByNode.get(nodeId) || [];
+    let pick = -1;
+    for (const c of list) {
+      if (c.trackIndex <= afterIdx) continue;
+      if (c.trackIndex >= beforeIdx) break;
+      pick = c.trackIndex;
+    }
+    return pick;
+  };
+
   const out = [];
   let cursor = -1;
   for (const st of subtramos) {
     if (!st.active) continue;
-    const startIdx = resolveIdx(st.startNodeId, cursor);
+    const tentativeEndIdx = firstIdxAfter(st.endNodeId, cursor);
+    if (tentativeEndIdx < 0) continue;
+    const startIdx = lastIdxBefore(st.startNodeId, cursor, tentativeEndIdx);
     if (startIdx < 0) continue;
-    const endIdx = resolveIdx(st.endNodeId, startIdx);
+    const endIdx = firstIdxAfter(st.endNodeId, startIdx);
     if (endIdx < 0 || endIdx <= startIdx) continue;
 
     const segPoints = rec.points.slice(startIdx, endIdx + 1);
