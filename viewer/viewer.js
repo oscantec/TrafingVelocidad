@@ -1414,32 +1414,55 @@ function subtramoRowsForRecorrido(rec, threshold) {
     return pick;
   };
 
+  // Every active subtramo produces exactly one row per recorrido. If the
+  // sequential walk can match both nodes we fill in the real metrics; if
+  // a node has no crossing in this track (e.g. nodo alias marcado con *
+  // que aún no está sobre el track, o el carro no pasó por ahí) the row
+  // is emitted anyway with empty times and zeroed metrics so the operator
+  // sees that the subtramo existed in the definition but no se recorrió.
   const out = [];
   let cursor = -1;
   for (const st of subtramos) {
     if (!st.active) continue;
+
     const tentativeEndIdx = firstIdxAfter(st.endNodeId, cursor);
-    if (tentativeEndIdx < 0) continue;
-    const startIdx = lastIdxBefore(st.startNodeId, cursor, tentativeEndIdx);
-    if (startIdx < 0) continue;
-    const endIdx = firstIdxAfter(st.endNodeId, startIdx);
-    if (endIdx < 0 || endIdx <= startIdx) continue;
+    const startIdx = tentativeEndIdx >= 0
+      ? lastIdxBefore(st.startNodeId, cursor, tentativeEndIdx)
+      : -1;
+    const endIdx = startIdx >= 0 ? firstIdxAfter(st.endNodeId, startIdx) : -1;
+    const hasMatch = startIdx >= 0 && endIdx > startIdx;
 
-    const segPoints = rec.points.slice(startIdx, endIdx + 1);
-    if (segPoints.length < 2) continue;
-    const metrics = segmentMetrics(segPoints);
+    if (hasMatch) {
+      const segPoints = rec.points.slice(startIdx, endIdx + 1);
+      if (segPoints.length >= 2) {
+        const metrics = segmentMetrics(segPoints);
+        out.push({
+          subtramo: st,
+          matched:  true,
+          startIdx, endIdx,
+          firstPointTime: segPoints[0].timestamp,
+          lastPointTime:  segPoints[segPoints.length - 1].timestamp,
+          distance: metrics.distance,
+          time:     metrics.time,
+          avgSpeed: metrics.avgSpeed,
+        });
+        cursor = endIdx;
+        continue;
+      }
+    }
 
+    // No usable crossings — still emit the row with blanks so the user
+    // sees every subtramo that's marked active.
     out.push({
       subtramo: st,
-      startIdx,
-      endIdx,
-      firstPointTime: segPoints[0].timestamp,
-      lastPointTime:  segPoints[segPoints.length - 1].timestamp,
-      distance: metrics.distance,
-      time:     metrics.time,
-      avgSpeed: metrics.avgSpeed,
+      matched:  false,
+      startIdx: -1, endIdx: -1,
+      firstPointTime: null,
+      lastPointTime:  null,
+      distance: 0,
+      time:     0,
+      avgSpeed: 0,
     });
-    cursor = endIdx;
   }
   return out;
 }
@@ -1487,6 +1510,7 @@ function computeExportRows() {
     const consecutivo = ri + 1;
     const hits = subtramoRowsForRecorrido(rec, threshold);
     for (const h of hits) {
+      const matched = h.matched;
       rows.push([
         upperOrBlank(diaClasificacion(rec.startTs)),
         upperOrBlank(fechaLargaEs(rec.startTs)),
@@ -1500,9 +1524,9 @@ function computeExportRows() {
         upperOrBlank(h.subtramo.sentido || ''),
         formatClock(h.firstPointTime),
         formatClock(h.lastPointTime),
-        +(h.distance / 1000).toFixed(2),
-        hhmmssFromSeconds(h.time),
-        +Number(h.avgSpeed || 0).toFixed(2),
+        matched ? +(h.distance / 1000).toFixed(2)  : '',
+        matched ? hhmmssFromSeconds(h.time)        : '',
+        matched ? +Number(h.avgSpeed || 0).toFixed(2) : '',
       ]);
     }
   });
