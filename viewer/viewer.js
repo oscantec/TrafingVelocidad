@@ -1344,7 +1344,7 @@ function renderSubtramosTable() {
       <td><select data-start>${nodeOptionsHtml(st.startNodeId)}</select></td>
       <td><select data-end>${nodeOptionsHtml(st.endNodeId)}</select></td>
       <td><input type="text" data-sentido value="${escapeHtml(st.sentido || '')}" placeholder="S - N"></td>
-      <td><button class="row-remove" data-remove title="Quitar">Quitar</button></td>
+      <td><button class="btn btn-sm btn-secondary" data-remove title="Quitar">Quitar</button></td>
     </tr>`;
   }).join('');
 
