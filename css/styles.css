@@ -197,6 +197,12 @@ input, select, textarea {
   letter-spacing: 0;
 }
 
+/* Solo-title variant (no subtitle): force uppercase + mild tracking. */
+.app-header .logo-text--solo {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .app-main {
   flex: 1;
   display: flex;
