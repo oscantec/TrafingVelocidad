@@ -88,11 +88,8 @@ const el = {
   toastContainer: $('toastContainer'),
   tabData: $('tabData'),
   tabSegments: $('tabSegments'),
-  // Study metadata
+  // Study metadata (Corredor is global; Tipo/Calzada/Periodo are per-recorrido)
   smCorredor: $('smCorredor'),
-  smTipo:     $('smTipo'),
-  smCalzada:  $('smCalzada'),
-  smPeriodo:  $('smPeriodo'),
   btnExportExcel: $('btnExportExcel'),
   // Recorridos list
   recorridosBox:   $('recorridosBox'),
@@ -386,6 +383,9 @@ function addRecorrido({ name, points, sourceUrl = '' }) {
     points,
     startTs,
     sourceUrl,
+    tipo:    '',
+    calzada: '',
+    periodo: '',
   };
   recorridos.push(rec);
   recorridos.sort((a, b) => a.startTs - b.startTs);
@@ -407,6 +407,16 @@ function renderRecorridosList() {
 
   const fmt = (ts) => new Date(ts).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });
 
+  const tipoOpts    = ['Público', 'Privado', 'TM', 'Otro'];
+  const calzadaOpts = ['Lenta', 'Rápida', 'Única', 'Otra'];
+  const periodoOpts = ['AM', 'PM'];
+  const mkOpts = (opts, current) => {
+    const head = `<option value="">—</option>`;
+    return head + opts.map((v) =>
+      `<option value="${escapeHtml(v)}"${current === v ? ' selected' : ''}>${escapeHtml(v)}</option>`
+    ).join('');
+  };
+
   el.recorridosList.innerHTML = recorridos.map((r, i) => {
     const isActive = r.id === activeRecorridoId;
     const activeCls = isActive ? ' active' : '';
@@ -415,8 +425,15 @@ function renderRecorridosList() {
     return `
       <div class="rec-item${activeCls}" data-id="${r.id}">
         <div class="rec-main">
-          <span class="rec-title">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
-          <span class="rec-meta">${fmt(r.startTs)} · ${r.points.length} pts</span>
+          <div>
+            <span class="rec-title">Recorrido ${i + 1} · ${escapeHtml(r.name)}</span>
+            <span class="rec-meta">${fmt(r.startTs)} · ${r.points.length} pts</span>
+          </div>
+          <div class="rec-classify">
+            <select data-field="tipo"    aria-label="Tipo de vehículo">${mkOpts(tipoOpts,    r.tipo)}</select>
+            <select data-field="calzada" aria-label="Calzada">${mkOpts(calzadaOpts, r.calzada)}</select>
+            <select data-field="periodo" aria-label="Período">${mkOpts(periodoOpts, r.periodo)}</select>
+          </div>
         </div>
         <div class="rec-actions">
           <button class="btn btn-sm btn-primary" data-view${viewDisabled}>${viewLabel}</button>
@@ -437,6 +454,14 @@ function renderRecorridosList() {
       if (row) removeRecorrido(row.dataset.id);
     });
   });
+  el.recorridosList.querySelectorAll('.rec-classify select').forEach((sel) => {
+    sel.addEventListener('change', (ev) => {
+      const row = ev.currentTarget.closest('[data-id]');
+      const rec = row && recorridos.find((r) => r.id === row.dataset.id);
+      if (!rec) return;
+      rec[ev.currentTarget.dataset.field] = ev.currentTarget.value;
+    });
+  });
 }
 
 function activateRecorrido(id) {
@@ -451,6 +476,9 @@ function activateRecorrido(id) {
 function removeRecorrido(id) {
   const idx = recorridos.findIndex((r) => r.id === id);
   if (idx === -1) return;
+  const rec = recorridos[idx];
+  const label = `Recorrido ${idx + 1} · ${rec.name}`;
+  if (!confirm(`¿Quitar "${label}"?\nEsta acción no se puede deshacer.`)) return;
   recorridos.splice(idx, 1);
   if (activeRecorridoId === id) {
     activeRecorridoId = recorridos[0]?.id || null;
@@ -1454,9 +1482,6 @@ function upperOrBlank(v) {
 function currentStudy() {
   return {
     corredor: (el.smCorredor?.value || '').trim(),
-    tipo:     el.smTipo?.value     || '',
-    calzada:  el.smCalzada?.value  || '',
-    periodo:  el.smPeriodo?.value  || '',
   };
 }
 
@@ -1473,12 +1498,12 @@ function computeExportRows() {
       rows.push([
         upperOrBlank(diaClasificacion(rec.startTs)),
         upperOrBlank(fechaLargaEs(rec.startTs)),
-        upperOrBlank(study.periodo),
+        upperOrBlank(rec.periodo),
         rec.sourceUrl || '',
         upperOrBlank(study.corredor),
         upperOrBlank(`${resolveNodeName(h.subtramo.startNodeId)} - ${resolveNodeName(h.subtramo.endNodeId)}`),
-        upperOrBlank(study.calzada),
-        upperOrBlank(study.tipo),
+        upperOrBlank(rec.calzada),
+        upperOrBlank(rec.tipo),
         consecutivo,
         upperOrBlank(h.subtramo.sentido || ''),
         formatClock(h.firstPointTime),

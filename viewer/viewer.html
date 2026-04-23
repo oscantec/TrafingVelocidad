@@ -212,9 +212,9 @@
     .file-input-wrapper strong { color: var(--ui-orange); font-weight: 700; }
 
     /* recorridos list cards */
-    .rec-list { display: flex; flex-direction: column; gap: var(--ui-sp-2); }
+    .rec-list { display: flex; flex-direction: column; gap: var(--ui-sp-3); }
     .rec-item {
-      display: flex; align-items: center; gap: var(--ui-sp-3);
+      display: flex; align-items: stretch; gap: var(--ui-sp-4);
       padding: 12px 14px;
       background: var(--ui-bg);
       border: 1px solid var(--ui-line);
@@ -222,7 +222,7 @@
       transition: all 0.15s ease;
     }
     .rec-item.active { border-color: var(--ui-orange); background: var(--ui-orange-soft); }
-    .rec-item .rec-main { flex: 1; min-width: 0; }
+    .rec-item .rec-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--ui-sp-2); }
     .rec-item .rec-title {
       display: block;
       font-size: 13px; font-weight: 600;
@@ -232,9 +232,36 @@
     .rec-item .rec-meta {
       display: block;
       font-size: 11px; color: var(--ui-ink-3);
-      margin-top: 2px;
+      margin-top: 1px;
     }
-    .rec-item .rec-actions { display: flex; gap: var(--ui-sp-2); flex-shrink: 0; }
+    .rec-item .rec-classify {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--ui-sp-2);
+      margin-top: var(--ui-sp-1);
+    }
+    .rec-item .rec-classify select {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 11px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      color: var(--ui-ink);
+      font-family: inherit;
+    }
+    .rec-item .rec-classify select:focus {
+      outline: none;
+      border-color: var(--ui-orange);
+      box-shadow: 0 0 0 2px var(--ui-orange-soft);
+    }
+    .rec-item.active .rec-classify select { background: #fff; }
+    .rec-item .rec-actions {
+      display: flex; flex-direction: column; gap: var(--ui-sp-2);
+      flex-shrink: 0; justify-content: center; align-items: stretch;
+      min-width: 110px;
+    }
+    .rec-item .rec-actions .btn { width: 100%; }
 
     /* nodes list inside the Nodos tab */
     .nodes-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
@@ -536,57 +563,20 @@
       <div class="viewer-panel">
         <!-- Tabs -->
         <div class="panel-tabs">
-          <button class="panel-tab active" data-tab="tab-info"    id="tabInfo">Info</button>
-          <button class="panel-tab"        data-tab="tab-tracks"  id="tabTracks">Tracks</button>
+          <button class="panel-tab active" data-tab="tab-tracks"  id="tabTracks">Tracks</button>
           <button class="panel-tab"        data-tab="tab-nodos"   id="tabNodos">Nodos</button>
           <button class="panel-tab"        data-tab="tab-tabla"   id="tabTabla">Tabla</button>
         </div>
 
-        <!-- Tab 1: INFO — datos del estudio -->
-        <div class="tab-content active" id="tab-info">
+        <!-- Tab: TRACKS — datos del estudio + carga y lista de recorridos -->
+        <div class="tab-content active" id="tab-tracks">
           <div class="viewer-panel-section">
-            <div class="section-header"><h2>Datos del estudio</h2></div>
-
-            <div class="form-group">
+            <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" for="smCorredor">Corredor</label>
               <input type="text" id="smCorredor" class="form-input" placeholder="Nombre del corredor">
             </div>
-
-            <div class="form-group">
-              <label class="form-label" for="smTipo">Tipo de vehículo</label>
-              <select id="smTipo" class="form-input">
-                <option value="">— Seleccionar —</option>
-                <option value="Público">Público</option>
-                <option value="Privado">Privado</option>
-                <option value="TM">TM</option>
-                <option value="Otro">Otro</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="smCalzada">Calzada</label>
-              <select id="smCalzada" class="form-input">
-                <option value="">— Seleccionar —</option>
-                <option value="Lenta">Lenta</option>
-                <option value="Rápida">Rápida</option>
-                <option value="Única">Única</option>
-                <option value="Otra">Otra</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="smPeriodo">Periodo</label>
-              <select id="smPeriodo" class="form-input">
-                <option value="">— Seleccionar —</option>
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
           </div>
-        </div>
 
-        <!-- Tab 2: TRACKS — carga de archivos / URLs y lista -->
-        <div class="tab-content" id="tab-tracks">
           <div class="viewer-panel-section">
             <div class="section-header"><h2>Importar recorrido</h2></div>
 
