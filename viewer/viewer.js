@@ -723,8 +723,8 @@ function displayNodes(nodes) {
 
   el.nodesList.innerHTML = nodes.map((n, i) => {
     const mark = n.cloud
-      ? '<span class="badge badge-success" style="padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">nube</span>'
-      : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);padding:1px 6px;font-size:9px;text-transform:none;letter-spacing:0;">local</span>';
+      ? '<span class="node-flag node-flag--cloud">nube</span>'
+      : '<span class="node-flag">local</span>';
     return `
       <div class="node-item" data-id="${n.id}">
         <div style="flex:1;min-width:0;">
