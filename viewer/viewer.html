@@ -56,6 +56,7 @@
       --ui-navy:       #1F3864;
       --ui-success:    #16A34A;
       --ui-warn:       #D97706;
+      --ui-danger:     #DC2626;
 
       --ui-sp-1: 4px; --ui-sp-2: 8px; --ui-sp-3: 12px;
       --ui-sp-4: 16px; --ui-sp-5: 20px; --ui-sp-6: 24px;
@@ -577,6 +578,8 @@
 
     /* map legend */
     .map-legend { position: absolute; bottom: 16px; left: 16px; z-index: 1000; }
+    .legend-item--base { margin-top: 6px; opacity: 0.55; }
+    .legend-line--dashed { background: var(--ui-ink-3); border-top: 1px dashed var(--ui-ink-3); height: 0; }
 
     /* Leaflet popup — reuses the same design tokens as the side panel. */
     .map-popup { min-width: 220px; font-family: inherit; }
@@ -589,6 +592,28 @@
     .map-popup .form-input { margin-bottom: var(--ui-sp-2); }
     .map-popup-actions { display: flex; gap: var(--ui-sp-2); }
     .map-popup-actions .btn { flex: 1; }
+
+    /* Map position markers (start / end dots) — shape + white ring are
+       shared; color comes from the inline --ui-success / --ui-danger var. */
+    .map-dot {
+      width: 12px; height: 12px;
+      border: 2px solid var(--ui-bg);
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.25);
+    }
+    .map-dot--cut { width: 14px; height: 14px; }
+
+    /* Node marker badge on the map — same orange + white ring as the rest. */
+    .map-node-mark {
+      width: 20px; height: 20px;
+      background: var(--ui-orange);
+      border: 2px solid var(--ui-bg);
+      border-radius: var(--ui-r-sm);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700;
+      color: var(--ui-bg);
+      box-shadow: 0 2px 8px rgba(240, 90, 26, 0.4);
+    }
 
     /* readout variant (segment polyline popup) — definition list layout */
     .map-popup-readout { min-width: 200px; }

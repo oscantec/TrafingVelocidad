@@ -113,6 +113,17 @@ async function init() {
   renderSubtramosTable();
 }
 
+// ── Design tokens (read from CSS so the palette lives in one place) ──
+// Leaflet's imperative APIs (L.polyline color, etc.) can't take var(),
+// so we resolve the CSS custom properties at runtime. Inline HTML in
+// divIcons can still use var() directly because it's parsed as DOM.
+function mapToken(name) {
+  const v = getComputedStyle(document.documentElement)
+    .getPropertyValue(`--ui-${name}`)
+    .trim();
+  return v || '#000';
+}
+
 // ── Map Setup ────────────────────────────────────────────────
 function initMap() {
   map = L.map('viewerMap', {
@@ -858,7 +869,7 @@ function drawBaseTrack(points) {
 
   const latlngs = points.map((p) => [p.lat, p.lng]);
   baseTrackLayer = L.polyline(latlngs, {
-    color: '#64748B',
+    color: mapToken('ink-2'),
     weight: 3.5,
     opacity: 0.75,
   }).addTo(map);
@@ -872,7 +883,7 @@ function drawBaseTrack(points) {
         symbol: L.Symbol.arrowHead({
           pixelSize: 11,
           polygon: false,
-          pathOptions: { stroke: true, color: '#F05A1A', weight: 2.2, opacity: 0.95 },
+          pathOptions: { stroke: true, color: mapToken('orange'), weight: 2.2, opacity: 0.95 },
         }),
       }],
     }).addTo(map);
@@ -883,28 +894,23 @@ function drawBaseTrack(points) {
     map.fitBounds(baseTrackLayer.getBounds(), { padding: [40, 40] });
   }
 
-  // Start/End markers
+  // Start/End markers — use the same success/danger tokens as the UI
   if (latlngs.length >= 2) {
-    const startIcon = L.divIcon({
+    const dotIcon = (token) => L.divIcon({
       className: '',
-      html: `<div style="width:12px;height:12px;background:#00C853;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(0,200,83,0.5);"></div>`,
+      html: `<div class="map-dot" style="background:var(--ui-${token});"></div>`,
       iconSize: [12, 12],
       iconAnchor: [6, 6],
     });
-
-    const endIcon = L.divIcon({
-      className: '',
-      html: `<div style="width:12px;height:12px;background:#FF3D00;border:2px solid #fff;border-radius:50%;box-shadow:0 0 8px rgba(255,61,0,0.5);"></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
-    });
+    const startIcon = dotIcon('success');
+    const endIcon   = dotIcon('danger');
 
     L.marker(latlngs[0], { icon: startIcon })
-      .bindPopup('<strong>Inicio</strong>')
+      .bindPopup('<div class="map-popup map-popup-readout"><div class="map-popup-title">Inicio</div></div>')
       .addTo(map);
 
     L.marker(latlngs[latlngs.length - 1], { icon: endIcon })
-      .bindPopup('<strong>Fin</strong>')
+      .bindPopup('<div class="map-popup map-popup-readout"><div class="map-popup-title">Fin</div></div>')
       .addTo(map);
   }
 }
@@ -917,24 +923,18 @@ function drawNodeMarkers(nodes) {
   nodes.forEach((node) => {
     const icon = L.divIcon({
       className: '',
-      html: `<div style="
-        width:20px;height:20px;
-        background:var(--accent, #FF6B00);
-        border:2px solid #fff;
-        border-radius:4px;
-        display:flex;align-items:center;justify-content:center;
-        font-size:10px;font-weight:700;color:#000;
-        box-shadow:0 2px 8px rgba(255,107,0,0.4);
-      ">${node.id}</div>`,
+      html: `<div class="map-node-mark">${node.id}</div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     });
 
     const marker = L.marker([node.lat, node.lng], { icon })
       .bindPopup(`
-        <strong>${node.name}</strong><br>
-        ID: ${node.id}<br>
-        ${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}
+        <div class="map-popup map-popup-readout">
+          <div class="map-popup-title">${escapeHtml(node.name)}</div>
+          <div class="map-popup-sub">ID ${node.id}</div>
+          <div class="map-popup-coords">${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}</div>
+        </div>
       `)
       .addTo(map);
 
@@ -1084,19 +1084,13 @@ function renderSegmentsOnMap(segments) {
       const cutPoint = seg.points[0];
       const cutIcon = L.divIcon({
         className: '',
-        html: `<div style="
-          width:14px;height:14px;
-          background:${color};
-          border:2px solid #fff;
-          border-radius:50%;
-          box-shadow:0 0 6px rgba(0,0,0,0.5);
-        "></div>`,
+        html: `<div class="map-dot map-dot--cut" style="background:${color};"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       });
 
       const marker = L.marker([cutPoint.lat, cutPoint.lng], { icon: cutIcon })
-        .bindPopup(`<strong>Punto de Corte ${i}</strong><br>${seg.startNode}`)
+        .bindPopup(`<div class="map-popup map-popup-readout"><div class="map-popup-title">Punto de corte ${i}</div><div class="map-popup-sub">${escapeHtml(seg.startNode)}</div></div>`)
         .addTo(map);
 
       cutPointMarkers.push(marker);
@@ -1160,8 +1154,8 @@ function renderLegend(segments) {
           <span>${seg.index}. ${seg.startNode} → ${seg.endNode}</span>
         </div>
       `).join('')}
-      <div class="legend-item" style="margin-top:6px;opacity:0.5;">
-        <span class="legend-line" style="background:#555;border-style:dashed;"></span>
+      <div class="legend-item legend-item--base">
+        <span class="legend-line legend-line--dashed"></span>
         <span>Track base</span>
       </div>
     </div>
