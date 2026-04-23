@@ -392,11 +392,13 @@
     }
     table.preview-table {
       width: 100%; border-collapse: collapse;
-      font-size: var(--fs-body); font-family: inherit;
+      font-size: var(--fs-meta); font-family: inherit;
+      line-height: 1.35;
     }
     table.preview-table thead th {
       background: var(--ui-navy); color: #fff;
-      padding: 10px 8px;
+      padding: 6px 8px;
+      font-size: 10px; letter-spacing: 0.06em;
       text-align: center;
       border-right: 1px solid rgba(255,255,255,0.12);
       position: sticky; top: 0;
@@ -404,7 +406,7 @@
     }
     table.preview-table thead th:last-child { border-right: none; }
     table.preview-table tbody td {
-      padding: 8px 10px; font-weight: 500;
+      padding: 4px 8px; font-weight: 500;
       border-right: 1px solid var(--ui-line-soft);
       border-bottom: 1px solid var(--ui-line-soft);
       color: var(--ui-ink);
