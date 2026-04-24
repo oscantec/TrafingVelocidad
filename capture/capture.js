@@ -8,7 +8,7 @@
 import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, getUnsyncedTracks, deleteTrack } from '../lib/db.js';
 import { haversineDistance, totalDistance, formatDistance, formatDuration, formatSpeed } from '../lib/geo.js';
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
-import { syncTrackToCloud, testConnection, testWritePermission } from '../lib/supabase.js';
+import { syncTrackToCloud, testConnection, testWritePermission, buildTrackShareUrl } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -842,8 +842,8 @@ function renderTracksList(tracks) {
       : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">Subir</button>`;
     // Only synced tracks can be shared — the viewer pulls points from Supabase.
     const shareBtn = (t.synced && t.cloudId)
-      ? `<button class="btn btn-sm btn-secondary" onclick="shareTrack('${t.cloudId}')" title="Copiar enlace público">Compartir</button>
-         <button class="btn btn-sm btn-secondary" onclick="openTrackViewer('${t.cloudId}')" title="Abrir visor en nueva pestaña">Abrir</button>`
+      ? `<button class="btn btn-sm btn-secondary" onclick="shareTrack('${t.cloudId}','${encodeURIComponent(t.name || '')}','${t.startTime || ''}')" title="Copiar enlace público">Compartir</button>
+         <button class="btn btn-sm btn-secondary" onclick="openTrackViewer('${t.cloudId}','${encodeURIComponent(t.name || '')}','${t.startTime || ''}')" title="Abrir visor en nueva pestaña">Abrir</button>`
       : '';
     return `
     <div class="saved-track-item" data-id="${t.id}">
@@ -863,26 +863,27 @@ function renderTracksList(tracks) {
   }).join('');
 }
 
-function buildTrackViewerUrl(cloudId) {
-  const base = new URL('../viewer/track.html', location.href);
-  base.searchParams.set('track', cloudId);
-  return base.href;
+function trackShareUrl(cloudId, nameEnc, startTime) {
+  return buildTrackShareUrl({
+    id: cloudId,
+    name: decodeURIComponent(nameEnc || ''),
+    start_time: startTime || null,
+  });
 }
 
-window.shareTrack = async function(cloudId) {
-  const url = buildTrackViewerUrl(cloudId);
+window.shareTrack = async function(cloudId, nameEnc, startTime) {
+  const url = trackShareUrl(cloudId, nameEnc, startTime);
   try {
     await navigator.clipboard.writeText(url);
     showToast('Enlace copiado al portapapeles', 'success');
   } catch (err) {
     console.warn('[capture] clipboard error:', err);
-    // Fallback: show the URL in a prompt so the user can copy manually.
     prompt('Copia el enlace manualmente:', url);
   }
 };
 
-window.openTrackViewer = function(cloudId) {
-  window.open(buildTrackViewerUrl(cloudId), '_blank', 'noopener');
+window.openTrackViewer = function(cloudId, nameEnc, startTime) {
+  window.open(trackShareUrl(cloudId, nameEnc, startTime), '_blank', 'noopener');
 };
 
 function escapeHtml(s) {

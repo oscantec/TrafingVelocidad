@@ -14,7 +14,8 @@ import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, re
 import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, listControlPointsByTramo,
          listSubtramosByTramo,
-         saveTramoComplete, deleteTramo } from '../lib/supabase.js';
+         saveTramoComplete, deleteTramo,
+         buildTrackShareUrl } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -378,6 +379,10 @@ async function handleTrackUrlImport() {
 }
 
 // ── Cloud import (tracks synced from the Capture module) ─────
+// Cache the full metadata for each cloud track so handleCloudImport
+// can build a pretty share URL without another round-trip.
+let cloudTracksById = new Map();
+
 async function refreshCloudTracks({ notify = false } = {}) {
   if (!el.cloudTrackSelect) return;
   const sel = el.cloudTrackSelect;
@@ -389,6 +394,7 @@ async function refreshCloudTracks({ notify = false } = {}) {
   } catch (err) {
     console.warn('[Viewer] cloud list error:', err);
   }
+  cloudTracksById = new Map(tracks.map((t) => [t.id, t]));
   if (!tracks.length) {
     sel.innerHTML = '<option value="">— Sin recorridos en la nube —</option>';
     if (notify) showToast('No hay recorridos guardados en la nube', 'warning');
@@ -410,13 +416,24 @@ async function refreshCloudTracks({ notify = false } = {}) {
   if (notify) showToast(`${tracks.length} recorrido(s) en la nube`, 'success');
 }
 
+async function copyShareLink(url) {
+  if (!url) { showToast('Este recorrido no tiene enlace compartible', 'warning'); return; }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Enlace copiado al portapapeles', 'success');
+  } catch (err) {
+    console.warn('[Viewer] clipboard error:', err);
+    prompt('Copia el enlace manualmente:', url);
+  }
+}
+
 async function handleCloudImport() {
   const sel = el.cloudTrackSelect;
   const id  = sel?.value;
   if (!id) { showToast('Selecciona un recorrido de la nube', 'warning'); return; }
 
-  const meta = [...sel.options].find((o) => o.value === id);
-  const label = meta ? meta.textContent.split(' · ')[0] : 'Recorrido';
+  const track = cloudTracksById.get(id) || null;
+  const label = track?.name || 'Recorrido';
 
   try {
     el.btnLoadCloud.disabled = true;
@@ -434,7 +451,15 @@ async function handleCloudImport() {
       altitude:  p.altitude == null ? null : Number(p.altitude),
       timestamp: new Date(p.timestamp).getTime(),
     }));
-    addRecorrido({ name: label, points, sourceUrl: `cloud://${id}` });
+    // sourceUrl = full shareable viewer URL; this becomes the LINK column
+    // in the Excel export and also drives the "Compartir" button in the
+    // recorrido card.
+    const shareUrl = buildTrackShareUrl({
+      id,
+      name: track?.name || label,
+      start_time: track?.start_time || null,
+    });
+    addRecorrido({ name: label, points, sourceUrl: shareUrl, cloudId: id });
     showToast(`Nube: ${label} · ${points.length} puntos`, 'success');
   } catch (err) {
     console.error('[Viewer] cloud import error:', err);
@@ -484,7 +509,7 @@ function handleTrackPasteImport() {
 }
 
 // ── Recorridos list ──────────────────────────────────────────
-function addRecorrido({ name, points, sourceUrl = '' }) {
+function addRecorrido({ name, points, sourceUrl = '', cloudId = '' }) {
   if (!points || !points.length) return;
   const startTs = points[0]?.timestamp || Date.now();
 
@@ -508,6 +533,7 @@ function addRecorrido({ name, points, sourceUrl = '' }) {
     points,
     startTs,
     sourceUrl,
+    cloudId,
     tipo:    '',
     calzada: '',
     periodo: '',
@@ -547,6 +573,10 @@ function renderRecorridosList() {
     const activeCls = isActive ? ' active' : '';
     const viewLabel = isActive ? 'Activo' : 'Visualizar';
     const viewDisabled = isActive ? ' disabled' : '';
+    const isShareable = !!(r.cloudId && r.sourceUrl);
+    const shareBtn = isShareable
+      ? `<button class="btn btn-sm btn-secondary" data-share title="Copiar enlace público">Compartir</button>`
+      : '';
     return `
       <div class="rec-item${activeCls}" data-id="${r.id}">
         <div class="rec-main">
@@ -562,6 +592,7 @@ function renderRecorridosList() {
         </div>
         <div class="rec-actions">
           <button class="btn btn-sm btn-primary" data-view${viewDisabled}>${viewLabel}</button>
+          ${shareBtn}
           <button class="btn btn-sm btn-secondary" data-remove>Quitar</button>
         </div>
       </div>`;
@@ -577,6 +608,13 @@ function renderRecorridosList() {
     btn.addEventListener('click', (ev) => {
       const row = ev.currentTarget.closest('[data-id]');
       if (row) removeRecorrido(row.dataset.id);
+    });
+  });
+  el.recorridosList.querySelectorAll('[data-share]').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      const row = ev.currentTarget.closest('[data-id]');
+      const rec = row && recorridos.find((r) => r.id === row.dataset.id);
+      if (rec) copyShareLink(rec.sourceUrl);
     });
   });
   el.recorridosList.querySelectorAll('.rec-classify select').forEach((sel) => {
