@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recorrido — Softrafing Velocidades</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Chart.js for the speed plot -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Arrow-head decorations on the track polyline -->
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.min.js"></script>
+
+  <!-- Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
+  <meta name="theme-color" content="#FFFFFF">
+
+  <style>
+    /* ═══ Track viewer — minimal, reuses the same token palette as /viewer ═══ */
+    :root {
+      --ui-ink:        #0F172A;
+      --ui-ink-2:      #475569;
+      --ui-ink-3:      #94A3B8;
+      --ui-line:       #E4E8EE;
+      --ui-line-soft:  #EEF1F5;
+      --ui-bg:         #FFFFFF;
+      --ui-bg-alt:     #F8FAFC;
+      --ui-orange:     #F05A1A;
+      --ui-orange-soft:#FFF1E8;
+      --ui-success:    #16A34A;
+      --ui-warn:       #D97706;
+      --ui-danger:     #DC2626;
+
+      --ui-sp-1: 4px; --ui-sp-2: 8px; --ui-sp-3: 12px;
+      --ui-sp-4: 16px; --ui-sp-5: 20px;
+
+      --fs-label: 11px;
+      --fs-meta:  11px;
+      --fs-body:  12.5px;
+      --fs-stat:  16px;
+      --ls-label: 0.08em;
+
+      --h-ctl:    32px;
+      --ui-r-sm: 6px;
+      --ui-r:    10px;
+    }
+
+    .panel-tab,
+    .section-header h2,
+    .btn,
+    .pb-stat-label,
+    .back-btn,
+    .badge,
+    .app-footer {
+      font-size: var(--fs-label); font-weight: 700;
+      letter-spacing: var(--ls-label); text-transform: uppercase;
+      font-family: inherit;
+    }
+
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .app-container { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+    .track-layout {
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .track-map   { flex: 1; position: relative; min-height: 0; }
+    #trackMap    { width: 100%; height: 100%; }
+
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: var(--h-ctl); padding: 0 12px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      color: var(--ui-ink-2);
+      cursor: pointer; text-decoration: none;
+      transition: all 0.15s ease;
+    }
+    .back-btn:hover { border-color: var(--ui-orange); color: var(--ui-orange); }
+
+    .track-title-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .track-title {
+      font-size: var(--fs-body); font-weight: 700;
+      color: var(--ui-ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 240px;
+    }
+    .track-meta {
+      font-size: var(--fs-meta); font-weight: 500;
+      color: var(--ui-ink-3);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* buttons — mismas reglas que /viewer */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      height: var(--h-ctl); padding: 0 14px;
+      background: var(--ui-bg);
+      color: var(--ui-ink);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn.btn-sm { height: 28px; padding: 0 10px; }
+    .btn-primary { background: var(--ui-orange); color: #fff; border-color: var(--ui-orange); }
+    .btn-primary:hover:not(:disabled) { filter: brightness(0.95); }
+    .btn-secondary { background: var(--ui-bg); color: var(--ui-ink); border-color: var(--ui-line); }
+    .btn-secondary:hover:not(:disabled) { background: var(--ui-bg-alt); border-color: var(--ui-ink-3); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* Playback panel — idéntica al /viewer */
+    .playback-panel {
+      display: none;
+      flex-direction: column;
+      gap: var(--ui-sp-4);
+      padding: var(--ui-sp-4) var(--ui-sp-5);
+      background: var(--ui-bg);
+      border-top: 1px solid var(--ui-line);
+      flex-shrink: 0;
+    }
+    .playback-panel.active { display: flex; }
+
+    .pb-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--ui-sp-3); }
+    .pb-stat {
+      padding: 10px 12px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      display: flex; flex-direction: column; gap: 3px;
+      min-width: 0;
+    }
+    .pb-stat-label { color: var(--ui-ink-3); }
+    .pb-stat-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .pb-stat-value {
+      font-size: var(--fs-stat); font-weight: 700;
+      color: var(--ui-ink); letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pb-stat-unit { font-size: var(--fs-meta); font-weight: 500; color: var(--ui-ink-3); }
+    .pb-stat-max  { font-size: var(--fs-meta); font-weight: 500; color: var(--ui-ink-3); margin-left: auto; font-variant-numeric: tabular-nums; }
+    .pb-stat-bar  { height: 3px; background: var(--ui-line-soft); border-radius: 99px; overflow: hidden; margin-top: 2px; }
+    .pb-stat-bar-fill { height: 100%; width: 0%; background: var(--ui-orange); border-radius: 99px; transition: width 0.3s ease; }
+
+    .pb-chart {
+      position: relative;
+      width: calc(100% + 2 * var(--ui-sp-5));
+      margin-left: calc(-1 * var(--ui-sp-5));
+      height: 150px;
+      background: var(--ui-bg);
+      border-top: 1px solid var(--ui-line);
+      border-bottom: 1px solid var(--ui-line);
+      padding: 6px 12px;
+    }
+    .pb-chart canvas { width: 100% !important; height: 100% !important; }
+
+    .pb-controls { display: flex; align-items: center; justify-content: space-between; gap: var(--ui-sp-3); flex-wrap: wrap; }
+    .pb-point-info { font-size: var(--fs-meta); font-weight: 500; color: var(--ui-ink-3); font-variant-numeric: tabular-nums; }
+    .pb-point-info strong { color: var(--ui-ink); font-weight: 600; }
+
+    .pb-transport { display: flex; align-items: center; gap: var(--ui-sp-2); }
+    .pb-speed {
+      height: var(--h-ctl); padding: 0 12px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      font-family: inherit;
+      font-size: var(--fs-body); font-weight: 500;
+      color: var(--ui-ink);
+      cursor: pointer;
+    }
+    .pb-icon {
+      width: var(--h-ctl); height: var(--h-ctl);
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 0;
+      background: var(--ui-bg);
+      color: var(--ui-ink-2);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .pb-icon:hover:not(:disabled) { background: var(--ui-bg-alt); color: var(--ui-ink); border-color: var(--ui-ink-3); }
+    .pb-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+    .pb-icon-play { background: var(--ui-orange); color: #fff; border-color: var(--ui-orange); }
+    .pb-icon-play:hover:not(:disabled) { filter: brightness(0.95); }
+    .pb-icon-play.active  { background: var(--ui-success); border-color: var(--ui-success); }
+    .pb-icon-pause.active { background: var(--ui-warn); color: #fff; border-color: var(--ui-warn); }
+
+    .map-dot {
+      width: 12px; height: 12px;
+      border: 2px solid var(--ui-bg);
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.25);
+    }
+
+    /* Shared footer (mirror del home) */
+    .app-footer {
+      padding: 10px 20px;
+      padding-bottom: calc(10px + var(--safe-bottom, 0px));
+      background: var(--ui-bg);
+      border-top: 1px solid var(--ui-line);
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      color: var(--ui-ink-3);
+      flex-shrink: 0;
+    }
+    .app-footer img { height: 20px; width: auto; }
+
+    .status-card {
+      position: absolute; inset: 50% 20px auto 20px;
+      transform: translateY(-50%);
+      padding: var(--ui-sp-5);
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+      text-align: center;
+      max-width: 380px;
+      margin: 0 auto;
+      z-index: 1000;
+    }
+    .status-card h3 {
+      margin: 0 0 8px;
+      font-size: var(--fs-body); font-weight: 700; color: var(--ui-ink);
+    }
+    .status-card p {
+      margin: 0;
+      font-size: var(--fs-meta); font-weight: 500; color: var(--ui-ink-2);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="flex items-center gap-md">
+        <a href="../index.html" class="back-btn" title="Volver al menú principal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          <span>Inicio</span>
+        </a>
+        <div class="logo">
+          <div class="logo-mark">
+            <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
+          </div>
+          <div class="track-title-block">
+            <span class="track-title" id="trackTitle">Recorrido</span>
+            <span class="track-meta" id="trackMetaHdr">—</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="track-layout">
+      <div class="track-map">
+        <div id="trackMap"></div>
+        <div class="status-card" id="statusCard">
+          <h3>Cargando recorrido…</h3>
+          <p>Recuperando los puntos desde la nube.</p>
+        </div>
+      </div>
+
+      <section class="playback-panel" id="playbackPanel">
+        <div class="pb-stats">
+          <div class="pb-stat" data-metric="time">
+            <div class="pb-stat-label">Tiempo</div>
+            <div class="pb-stat-row">
+              <span class="pb-stat-value" data-value>00:00:00</span>
+              <span class="pb-stat-max">/ <span data-max>—</span></span>
+            </div>
+            <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+          </div>
+
+          <div class="pb-stat" data-metric="distance">
+            <div class="pb-stat-label">Distancia</div>
+            <div class="pb-stat-row">
+              <span class="pb-stat-value" data-value>0.000</span>
+              <span class="pb-stat-unit">km</span>
+              <span class="pb-stat-max">/ <span data-max>—</span></span>
+            </div>
+            <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+          </div>
+
+          <div class="pb-stat" data-metric="speed">
+            <div class="pb-stat-label">Velocidad</div>
+            <div class="pb-stat-row">
+              <span class="pb-stat-value" data-value>0.0</span>
+              <span class="pb-stat-unit">km/h</span>
+              <span class="pb-stat-max">máx <span data-max>—</span></span>
+            </div>
+            <div class="pb-stat-bar"><div class="pb-stat-bar-fill" data-fill></div></div>
+          </div>
+        </div>
+
+        <div class="pb-chart">
+          <canvas id="playbackChart"></canvas>
+        </div>
+
+        <div class="pb-controls">
+          <span class="pb-point-info">
+            <strong id="pbIndex">0</strong>/<strong id="pbTotal">0</strong>
+            · <strong id="pbTimestamp">—</strong>
+          </span>
+          <div class="pb-transport">
+            <select class="pb-speed" id="pbSpeed" aria-label="Velocidad de reproducción">
+              <option value="50">2x</option>
+              <option value="300" selected>1x</option>
+              <option value="800">0.5x</option>
+            </select>
+            <button class="pb-icon pb-icon-stop"  id="pbStop"  disabled aria-label="Detener">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+            </button>
+            <button class="pb-icon pb-icon-play"  id="pbPlay"  disabled aria-label="Reproducir">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="pb-icon pb-icon-pause" id="pbPause" disabled aria-label="Pausar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="app-footer">
+      <span>Powered by</span>
+      <img src="../Images/LogoNextCan.png" alt="NextCan">
+    </footer>
+  </div>
+
+  <script type="module" src="track.js"></script>
+</body>
+</html>

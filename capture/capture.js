@@ -840,6 +840,11 @@ function renderTracksList(tracks) {
     const syncBtn = t.synced
       ? ''
       : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">Subir</button>`;
+    // Only synced tracks can be shared — the viewer pulls points from Supabase.
+    const shareBtn = (t.synced && t.cloudId)
+      ? `<button class="btn btn-sm btn-secondary" onclick="shareTrack('${t.cloudId}')" title="Copiar enlace público">Compartir</button>
+         <button class="btn btn-sm btn-secondary" onclick="openTrackViewer('${t.cloudId}')" title="Abrir visor en nueva pestaña">Abrir</button>`
+      : '';
     return `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
@@ -850,12 +855,35 @@ function renderTracksList(tracks) {
       </div>
       <div class="btn-group">
         ${syncBtn}
+        ${shareBtn}
         <button class="btn btn-sm btn-secondary" onclick="loadTrack('${t.id}')" title="Ver en mapa">Ver</button>
         <button class="btn btn-sm btn-danger" onclick="removeTrack('${t.id}')" title="Eliminar">Quitar</button>
       </div>
     </div>`;
   }).join('');
 }
+
+function buildTrackViewerUrl(cloudId) {
+  const base = new URL('../viewer/track.html', location.href);
+  base.searchParams.set('track', cloudId);
+  return base.href;
+}
+
+window.shareTrack = async function(cloudId) {
+  const url = buildTrackViewerUrl(cloudId);
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('Enlace copiado al portapapeles', 'success');
+  } catch (err) {
+    console.warn('[capture] clipboard error:', err);
+    // Fallback: show the URL in a prompt so the user can copy manually.
+    prompt('Copia el enlace manualmente:', url);
+  }
+};
+
+window.openTrackViewer = function(cloudId) {
+  window.open(buildTrackViewerUrl(cloudId), '_blank', 'noopener');
+};
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({

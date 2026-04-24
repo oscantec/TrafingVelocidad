@@ -85,11 +85,25 @@
     .pb-stat-label,
     .back-btn,
     .badge,
+    .app-footer,
     table.preview-table thead th {
       font-size: var(--fs-label); font-weight: 700;
       letter-spacing: var(--ls-label); text-transform: uppercase;
       font-family: inherit;
     }
+
+    /* Shared footer (same visual language as the landing page). */
+    .app-footer {
+      padding: 10px 20px;
+      padding-bottom: calc(10px + var(--safe-bottom, 0px));
+      background: var(--ui-bg);
+      border-top: 1px solid var(--ui-line);
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      color: var(--ui-ink-3);
+      flex-shrink: 0;
+    }
+    .app-footer img { height: 20px; width: auto; }
 
     /* shell */
     html, body { height: 100%; }
@@ -979,6 +993,11 @@
         </section>
       </div>
     </div>
+
+    <footer class="app-footer">
+      <span>Powered by</span>
+      <img src="../Images/LogoNextCan.png" alt="NextCan">
+    </footer>
 
     <!-- Toast Container -->
     <div id="toastContainer" class="toast-container"></div>

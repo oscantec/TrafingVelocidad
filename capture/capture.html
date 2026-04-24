@@ -303,6 +303,20 @@
 
     .bg-warning-banner.active { display: flex; }
 
+    .app-footer {
+      padding: 10px 20px;
+      padding-bottom: calc(10px + var(--safe-bottom, 0px));
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .app-footer img { height: 20px; width: auto; }
+
     @media (max-width: 600px) {
       .capture-metrics {
         grid-template-columns: repeat(2, 1fr);
@@ -507,6 +521,11 @@
         </div>
       </div>
     </div>
+
+    <footer class="app-footer">
+      <span>Powered by</span>
+      <img src="../Images/LogoNextCan.png" alt="NextCan">
+    </footer>
 
     <!-- Stop Confirm Modal -->
     <div class="modal-overlay" id="stopModal">
