@@ -840,11 +840,25 @@ function renderTracksList(tracks) {
     const syncBtn = t.synced
       ? ''
       : `<button class="btn btn-sm btn-secondary" onclick="pushTrack('${t.id}')" title="Subir a la nube">Subir</button>`;
+
     // Only synced tracks can be shared — the viewer pulls points from Supabase.
-    const shareBtn = (t.synced && t.cloudId)
-      ? `<button class="btn btn-sm btn-secondary" onclick="shareTrack('${t.cloudId}','${encodeURIComponent(t.name || '')}','${t.startTime || ''}')" title="Copiar enlace público">Compartir</button>
-         <button class="btn btn-sm btn-secondary" onclick="openTrackViewer('${t.cloudId}','${encodeURIComponent(t.name || '')}','${t.startTime || ''}')" title="Abrir visor en nueva pestaña">Abrir</button>`
-      : '';
+    let shareRow = '';
+    if (t.synced && t.cloudId) {
+      const url = buildTrackShareUrl({
+        id: t.cloudId,
+        name: t.name,
+        start_time: t.startTime ? new Date(t.startTime).toISOString() : null,
+      });
+      const escUrl = escapeHtml(url);
+      shareRow = `
+        <div class="share-row">
+          <a class="share-link" href="${escUrl}" target="_blank" rel="noopener" title="Abrir visor"
+             onclick="event.stopPropagation()">${escUrl}</a>
+          <button class="btn btn-sm btn-secondary share-copy"
+                  onclick="copyShareUrl('${escUrl.replace(/'/g, "\\'")}')">Copiar</button>
+        </div>`;
+    }
+
     return `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
@@ -852,10 +866,10 @@ function renderTracksList(tracks) {
         <span class="track-meta">
           ${new Date(t.startTime).toLocaleString('es')} · ${t.pointCount || 0} pts · ${t.status}
         </span>
+        ${shareRow}
       </div>
       <div class="btn-group">
         ${syncBtn}
-        ${shareBtn}
         <button class="btn btn-sm btn-secondary" onclick="loadTrack('${t.id}')" title="Ver en mapa">Ver</button>
         <button class="btn btn-sm btn-danger" onclick="removeTrack('${t.id}')" title="Eliminar">Quitar</button>
       </div>
@@ -863,16 +877,7 @@ function renderTracksList(tracks) {
   }).join('');
 }
 
-function trackShareUrl(cloudId, nameEnc, startTime) {
-  return buildTrackShareUrl({
-    id: cloudId,
-    name: decodeURIComponent(nameEnc || ''),
-    start_time: startTime || null,
-  });
-}
-
-window.shareTrack = async function(cloudId, nameEnc, startTime) {
-  const url = trackShareUrl(cloudId, nameEnc, startTime);
+window.copyShareUrl = async function(url) {
   try {
     await navigator.clipboard.writeText(url);
     showToast('Enlace copiado al portapapeles', 'success');
@@ -880,10 +885,6 @@ window.shareTrack = async function(cloudId, nameEnc, startTime) {
     console.warn('[capture] clipboard error:', err);
     prompt('Copia el enlace manualmente:', url);
   }
-};
-
-window.openTrackViewer = function(cloudId, nameEnc, startTime) {
-  window.open(trackShareUrl(cloudId, nameEnc, startTime), '_blank', 'noopener');
 };
 
 function escapeHtml(s) {

@@ -574,8 +574,13 @@ function renderRecorridosList() {
     const viewLabel = isActive ? 'Activo' : 'Visualizar';
     const viewDisabled = isActive ? ' disabled' : '';
     const isShareable = !!(r.cloudId && r.sourceUrl);
-    const shareBtn = isShareable
-      ? `<button class="btn btn-sm btn-secondary" data-share title="Copiar enlace público">Compartir</button>`
+    const shareRow = isShareable
+      ? `
+        <div class="share-row">
+          <a class="share-link" href="${escapeHtml(r.sourceUrl)}" target="_blank" rel="noopener"
+             title="Abrir visor público en nueva pestaña">${escapeHtml(r.sourceUrl)}</a>
+          <button class="btn btn-sm btn-secondary" data-share title="Copiar enlace">Copiar</button>
+        </div>`
       : '';
     return `
       <div class="rec-item${activeCls}" data-id="${r.id}">
@@ -589,10 +594,10 @@ function renderRecorridosList() {
             <select data-field="calzada" aria-label="Calzada">${mkOpts(calzadaOpts, r.calzada)}</select>
             <select data-field="periodo" aria-label="Período">${mkOpts(periodoOpts, r.periodo)}</select>
           </div>
+          ${shareRow}
         </div>
         <div class="rec-actions">
           <button class="btn btn-sm btn-primary" data-view${viewDisabled}>${viewLabel}</button>
-          ${shareBtn}
           <button class="btn btn-sm btn-secondary" data-remove>Quitar</button>
         </div>
       </div>`;

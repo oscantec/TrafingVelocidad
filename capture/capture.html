@@ -263,6 +263,26 @@
       font-size: 10px;
     }
 
+    /* Public link row shown on synced tracks. */
+    .saved-track-item .share-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 6px;
+      padding: 4px 8px;
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--r-sm);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      max-width: 100%;
+    }
+    .saved-track-item .share-link {
+      flex: 1; min-width: 0;
+      color: var(--accent);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .saved-track-item .share-link:hover { text-decoration: underline; }
+    .saved-track-item .share-copy { flex-shrink: 0; height: 22px; padding: 0 8px; font-size: 10px; }
+
     /* Back button */
     .back-btn {
       display: inline-flex;
