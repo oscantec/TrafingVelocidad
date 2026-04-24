@@ -115,7 +115,7 @@ async function boot() {
     if (meta.point_count) parts.push(`${meta.point_count} pts`);
     if (meta.distance)    parts.push(`${(meta.distance / 1000).toFixed(2)} km`);
     $('trackMetaHdr').textContent = parts.join(' · ') || '—';
-    document.title = `${meta.name || 'Recorrido'} — Softrafing Velocidades`;
+    document.title = meta.name || 'Recorrido';
   }
 
   // Points

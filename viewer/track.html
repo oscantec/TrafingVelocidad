@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recorrido — Softrafing Velocidades</title>
+  <title>Recorrido</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,7 +21,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <link rel="stylesheet" href="../css/styles.css">
-  <link rel="icon" href="../Images/Softrafingvel.png" type="image/png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23F05A1A'/%3E%3C/svg%3E" type="image/svg+xml">
   <meta name="theme-color" content="#FFFFFF">
 
   <style>
@@ -54,13 +54,8 @@
       --ui-r:    10px;
     }
 
-    .panel-tab,
-    .section-header h2,
     .btn,
-    .pb-stat-label,
-    .back-btn,
-    .badge,
-    .app-footer {
+    .pb-stat-label {
       font-size: var(--fs-label); font-weight: 700;
       letter-spacing: var(--ls-label); text-transform: uppercase;
       font-family: inherit;
@@ -78,24 +73,21 @@
     .track-map   { flex: 1; position: relative; min-height: 0; }
     #trackMap    { width: 100%; height: 100%; }
 
-    .back-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      height: var(--h-ctl); padding: 0 12px;
+    /* Neutral header — no branding, no nav, no link back home.
+       Just the track title and metadata. */
+    .track-header {
+      padding: 12px 20px;
+      padding-top: calc(12px + var(--safe-top, 0px));
       background: var(--ui-bg);
-      border: 1px solid var(--ui-line);
-      border-radius: var(--ui-r-sm);
-      color: var(--ui-ink-2);
-      cursor: pointer; text-decoration: none;
-      transition: all 0.15s ease;
+      border-bottom: 1px solid var(--ui-line);
+      flex-shrink: 0;
     }
-    .back-btn:hover { border-color: var(--ui-orange); color: var(--ui-orange); }
-
     .track-title-block { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .track-title {
-      font-size: var(--fs-body); font-weight: 700;
+      font-size: var(--fs-stat); font-weight: 700;
       color: var(--ui-ink);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      max-width: 240px;
+      letter-spacing: -0.01em;
     }
     .track-meta {
       font-size: var(--fs-meta); font-weight: 500;
@@ -207,19 +199,6 @@
       box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.25);
     }
 
-    /* Shared footer (mirror del home) */
-    .app-footer {
-      padding: 10px 20px;
-      padding-bottom: calc(10px + var(--safe-bottom, 0px));
-      background: var(--ui-bg);
-      border-top: 1px solid var(--ui-line);
-      display: flex; align-items: center; justify-content: center;
-      gap: 10px;
-      color: var(--ui-ink-3);
-      flex-shrink: 0;
-    }
-    .app-footer img { height: 20px; width: auto; }
-
     .status-card {
       position: absolute; inset: 50% 20px auto 20px;
       transform: translateY(-50%);
@@ -246,23 +225,10 @@
 </head>
 <body>
   <div class="app-container">
-    <header class="app-header">
-      <div class="flex items-center gap-md">
-        <a href="../index.html" class="back-btn" title="Volver al menú principal">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>Inicio</span>
-        </a>
-        <div class="logo">
-          <div class="logo-mark">
-            <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
-          </div>
-          <div class="track-title-block">
-            <span class="track-title" id="trackTitle">Recorrido</span>
-            <span class="track-meta" id="trackMetaHdr">—</span>
-          </div>
-        </div>
+    <header class="track-header">
+      <div class="track-title-block">
+        <span class="track-title" id="trackTitle">Recorrido</span>
+        <span class="track-meta" id="trackMetaHdr">—</span>
       </div>
     </header>
 
@@ -335,11 +301,6 @@
         </div>
       </section>
     </div>
-
-    <footer class="app-footer">
-      <span>Powered by</span>
-      <img src="../Images/LogoNextCan.png" alt="NextCan">
-    </footer>
   </div>
 
   <script type="module" src="track.js"></script>
