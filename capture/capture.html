@@ -302,9 +302,9 @@
     .app-header > .header-center { justify-self: center; }
     .app-header > :last-child    { justify-self: end; }
 
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .header-left .logo-mark { height: 52px; }
-    .header-left .logo-mark img { height: 100%; width: auto; object-fit: contain; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .header-right .logo-mark { height: 52px; }
+    .header-right .logo-mark img { height: 100%; width: auto; object-fit: contain; }
 
     .header-title {
       font-size: 22px; font-weight: 800;
@@ -376,21 +376,16 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="header-left">
-        <a href="../index.html" class="back-btn" id="btnBackHome" title="Volver al menú principal">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>Inicio</span>
-        </a>
-        <div class="logo-mark">
-          <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
-        </div>
-      </div>
+      <a href="../index.html" class="back-btn" id="btnBackHome" title="Volver al menú principal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Inicio</span>
+      </a>
       <div class="header-center">
         <span class="header-title">Captura</span>
       </div>
-      <div class="flex items-center gap-md">
+      <div class="header-right">
         <div id="recordingBadge" class="recording-indicator hidden">
           <div class="rec-dot"></div>
           <span>REC</span>
@@ -398,6 +393,9 @@
         <div id="wakeLockBadge" class="badge badge-success hidden">
           <span class="badge-dot"></span>
           <span>WAKE LOCK</span>
+        </div>
+        <div class="logo-mark">
+          <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
         </div>
       </div>
     </header>
