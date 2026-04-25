@@ -62,29 +62,35 @@
     }
 
     .capture-metric .metric-label {
-      font-size: 10.5px;
+      font-family: var(--font-sans);
+      font-size: 11px;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
       font-weight: 700;
       margin-bottom: 6px;
     }
 
+    /* Metric numbers: same sans-serif as the rest of the UI, tabular
+       digits so the columns line up. NO monospace LCD font — that's
+       what was breaking the visual unity. */
     .capture-metric .metric-value {
-      font-family: var(--font-mono);
-      font-size: 32px;
+      font-family: var(--font-sans);
+      font-size: 30px;
       font-weight: 700;
       line-height: 1.05;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.01em;
+      font-variant-numeric: tabular-nums;
       color: var(--text-primary);
     }
 
     .capture-metric .metric-unit {
       display: block;
+      font-family: var(--font-sans);
       font-size: 11px;
       color: var(--text-muted);
-      font-family: var(--font-sans);
       font-weight: 500;
+      letter-spacing: 0;
       margin-top: 4px;
     }
 
@@ -533,7 +539,7 @@
       </div>
       <div class="capture-metric">
         <div class="metric-label">Tiempo</div>
-        <div class="metric-value mono" id="metricTime">00:00:00</div>
+        <div class="metric-value" id="metricTime">00:00:00</div>
         <div class="metric-unit">&nbsp;</div>
       </div>
       <div class="capture-metric">
