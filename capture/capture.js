@@ -8,7 +8,8 @@
 import { openDB, createTrack, updateTrack, addPoint, getTrackPoints, getAllTracks, getUnsyncedTracks, deleteTrack } from '../lib/db.js';
 import { haversineDistance, totalDistance, formatDistance, formatDuration, formatSpeed } from '../lib/geo.js';
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
-import { syncTrackToCloud, testConnection, testWritePermission, buildTrackShareUrl } from '../lib/supabase.js';
+import { syncTrackToCloud, testConnection, testWritePermission, buildTrackShareUrl,
+         encodeTrackName, decodeTrackName } from '../lib/supabase.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -75,6 +76,9 @@ const el = {
   toastContainer: $('toastContainer'),
   startModal: $('startModal'),
   modalTrackName: $('modalTrackName'),
+  modalTipo:    $('modalTipo'),
+  modalCalzada: $('modalCalzada'),
+  modalPeriodo: $('modalPeriodo'),
   modalStart: $('modalStart'),
   modalCancel: $('modalCancel'),
   stopModal: $('stopModal'),
@@ -321,15 +325,22 @@ function bindEvents() {
 
   // Modal: Start
   el.modalStart.addEventListener('click', async () => {
-    const name = el.modalTrackName.value.trim();
-    if (!name) {
+    const baseName = el.modalTrackName.value.trim();
+    if (!baseName) {
       el.modalTrackName.focus();
       el.modalTrackName.style.borderColor = 'var(--danger)';
       setTimeout(() => { el.modalTrackName.style.borderColor = ''; }, 1500);
       return;
     }
+    const tipo    = el.modalTipo?.value    || '';
+    const calzada = el.modalCalzada?.value || '';
+    const periodo = el.modalPeriodo?.value || '';
+    // Stash tipo/calzada/periodo on the name itself — that way we don't
+    // have to migrate the Supabase schema to add three new columns and
+    // the public viewer can still decode them later.
+    const fullName = encodeTrackName(baseName, tipo, calzada, periodo);
     closeStartModal();
-    await startRecording(name);
+    await startRecording(fullName);
   });
   el.modalCancel.addEventListener('click', closeStartModal);
   el.startModal.addEventListener('click', (e) => {
@@ -426,6 +437,12 @@ function openStartModal() {
   const pad = (n) => String(n).padStart(2, '0');
   const defaultName = `Recorrido ${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
   el.modalTrackName.value = defaultName;
+  // Default the period from the current hour. Tipo/calzada empiezan vacíos
+  // — el operador los pone si quiere; si no, queda libre y la tabla del
+  // visor permite cambiarlos después.
+  if (el.modalTipo)    el.modalTipo.value = '';
+  if (el.modalCalzada) el.modalCalzada.value = '';
+  if (el.modalPeriodo) el.modalPeriodo.value = now.getHours() < 12 ? 'AM' : 'PM';
   el.startModal.classList.add('active');
   setTimeout(() => { el.modalTrackName.focus(); el.modalTrackName.select(); }, 80);
 }
@@ -834,6 +851,9 @@ function renderTracksList(tracks) {
   }
 
   el.savedTracksList.innerHTML = tracks.map((t) => {
+    const decoded = decodeTrackName(t.name);
+    const displayName = decoded.name || t.name;
+    const classifyBits = [decoded.tipo, decoded.calzada, decoded.periodo].filter(Boolean).join(' · ');
     const cloudTag = t.synced
       ? '<span class="badge badge-success" style="text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">nube</span>'
       : '<span class="badge" style="background:var(--surface-alt);color:var(--text-muted);text-transform:none;letter-spacing:0;padding:2px 8px;font-size:10px;">solo local</span>';
@@ -846,7 +866,7 @@ function renderTracksList(tracks) {
     if (t.synced && t.cloudId) {
       const url = buildTrackShareUrl({
         id: t.cloudId,
-        name: t.name,
+        name: displayName,
         start_time: t.startTime ? new Date(t.startTime).toISOString() : null,
       });
       const escUrl = escapeHtml(url);
@@ -862,9 +882,9 @@ function renderTracksList(tracks) {
     return `
     <div class="saved-track-item" data-id="${t.id}">
       <div class="track-info">
-        <span class="track-title">${escapeHtml(t.name)} ${cloudTag}</span>
+        <span class="track-title">${escapeHtml(displayName)} ${cloudTag}</span>
         <span class="track-meta">
-          ${new Date(t.startTime).toLocaleString('es')} · ${t.pointCount || 0} pts · ${t.status}
+          ${new Date(t.startTime).toLocaleString('es')} · ${t.pointCount || 0} pts · ${t.status}${classifyBits ? ' · ' + escapeHtml(classifyBits) : ''}
         </span>
         ${shareRow}
       </div>

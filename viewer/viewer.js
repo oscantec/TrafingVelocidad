@@ -15,7 +15,7 @@ import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, listControlPointsByTramo,
          listSubtramosByTramo,
          saveTramoComplete, deleteTramo,
-         buildTrackShareUrl } from '../lib/supabase.js';
+         buildTrackShareUrl, decodeTrackName } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -406,10 +406,10 @@ async function refreshCloudTracks({ notify = false } = {}) {
   };
   sel.innerHTML = '<option value="">— Selecciona un recorrido guardado —</option>'
     + tracks.map((t) => {
-        const name = t.name || 'Recorrido sin nombre';
+        const decoded = decodeTrackName(t.name || 'Recorrido sin nombre');
         const when = fmt(t.start_time);
         const pts  = t.point_count ?? '—';
-        return `<option value="${t.id}">${escapeHtml(name)} · ${when} · ${pts} pts</option>`;
+        return `<option value="${t.id}">${escapeHtml(decoded.name)} · ${when} · ${pts} pts</option>`;
       }).join('');
   // Preserve the previously selected option when possible.
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
@@ -433,7 +433,11 @@ async function handleCloudImport() {
   if (!id) { showToast('Selecciona un recorrido de la nube', 'warning'); return; }
 
   const track = cloudTracksById.get(id) || null;
-  const label = track?.name || 'Recorrido';
+  // Names stored in Supabase carry "[tipo|calzada|periodo]" suffixes;
+  // decode them so the card shows the clean nombre AND the three
+  // classification selects come pre-filled.
+  const decoded = decodeTrackName(track?.name || 'Recorrido');
+  const label = decoded.name;
 
   try {
     el.btnLoadCloud.disabled = true;
@@ -452,14 +456,16 @@ async function handleCloudImport() {
       timestamp: new Date(p.timestamp).getTime(),
     }));
     // sourceUrl = full shareable viewer URL; this becomes the LINK column
-    // in the Excel export and also drives the "Compartir" button in the
-    // recorrido card.
+    // in the Excel export and also drives the "Copiar" link en la card.
     const shareUrl = buildTrackShareUrl({
       id,
-      name: track?.name || label,
+      name: label,
       start_time: track?.start_time || null,
     });
-    addRecorrido({ name: label, points, sourceUrl: shareUrl, cloudId: id });
+    addRecorrido({
+      name: label, points, sourceUrl: shareUrl, cloudId: id,
+      tipo: decoded.tipo, calzada: decoded.calzada, periodo: decoded.periodo,
+    });
     showToast(`Nube: ${label} · ${points.length} puntos`, 'success');
   } catch (err) {
     console.error('[Viewer] cloud import error:', err);
@@ -509,7 +515,8 @@ function handleTrackPasteImport() {
 }
 
 // ── Recorridos list ──────────────────────────────────────────
-function addRecorrido({ name, points, sourceUrl = '', cloudId = '' }) {
+function addRecorrido({ name, points, sourceUrl = '', cloudId = '',
+                        tipo = '', calzada = '', periodo = '' }) {
   if (!points || !points.length) return;
   const startTs = points[0]?.timestamp || Date.now();
 
@@ -534,9 +541,9 @@ function addRecorrido({ name, points, sourceUrl = '', cloudId = '' }) {
     startTs,
     sourceUrl,
     cloudId,
-    tipo:    '',
-    calzada: '',
-    periodo: '',
+    tipo,
+    calzada,
+    periodo,
   };
   recorridos.push(rec);
   recorridos.sort((a, b) => a.startTs - b.startTs);
@@ -561,8 +568,10 @@ function renderRecorridosList() {
   const tipoOpts    = ['Público', 'Privado', 'TM', 'Otro'];
   const calzadaOpts = ['Lenta', 'Rápida', 'Única', 'Otra'];
   const periodoOpts = ['AM', 'PM'];
-  const mkOpts = (opts, current) => {
-    const head = `<option value="">—</option>`;
+  // The placeholder doubles as the field's label so the operator knows
+  // qué se le está preguntando sin necesidad de un <label> aparte.
+  const mkOpts = (opts, current, placeholder) => {
+    const head = `<option value=""${current ? '' : ' selected'}>${escapeHtml(placeholder)}</option>`;
     return head + opts.map((v) =>
       `<option value="${escapeHtml(v)}"${current === v ? ' selected' : ''}>${escapeHtml(v)}</option>`
     ).join('');
@@ -590,9 +599,9 @@ function renderRecorridosList() {
             <span class="rec-meta">${fmt(r.startTs)} · ${r.points.length} pts</span>
           </div>
           <div class="rec-classify">
-            <select data-field="tipo"    aria-label="Tipo de vehículo">${mkOpts(tipoOpts,    r.tipo)}</select>
-            <select data-field="calzada" aria-label="Calzada">${mkOpts(calzadaOpts, r.calzada)}</select>
-            <select data-field="periodo" aria-label="Período">${mkOpts(periodoOpts, r.periodo)}</select>
+            <select data-field="tipo"    aria-label="Tipo de vehículo">${mkOpts(tipoOpts,    r.tipo,    'Tipo')}</select>
+            <select data-field="calzada" aria-label="Calzada">${mkOpts(calzadaOpts, r.calzada, 'Calzada')}</select>
+            <select data-field="periodo" aria-label="Período">${mkOpts(periodoOpts, r.periodo, 'Período')}</select>
           </div>
           ${shareRow}
         </div>

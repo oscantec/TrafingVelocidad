@@ -5,7 +5,7 @@
  * processing viewer. No editing, no import, just observation.
  */
 
-import { listCloudTracks, getCloudTrackPoints } from '../lib/supabase.js';
+import { listCloudTracks, getCloudTrackPoints, decodeTrackName } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 const $ = (id) => document.getElementById(id);
@@ -106,7 +106,9 @@ async function boot() {
   }
 
   if (meta) {
-    $('trackTitle').textContent = meta.name || 'Recorrido';
+    const decoded = decodeTrackName(meta.name);
+    const cleanName = decoded.name || 'Recorrido';
+    $('trackTitle').textContent = cleanName;
     const parts = [];
     if (meta.start_time) {
       const d = new Date(meta.start_time);
@@ -114,8 +116,10 @@ async function boot() {
     }
     if (meta.point_count) parts.push(`${meta.point_count} pts`);
     if (meta.distance)    parts.push(`${(meta.distance / 1000).toFixed(2)} km`);
+    const classifyBits = [decoded.tipo, decoded.calzada, decoded.periodo].filter(Boolean).join(' · ');
+    if (classifyBits) parts.push(classifyBits);
     $('trackMetaHdr').textContent = parts.join(' · ') || '—';
-    document.title = meta.name || 'Recorrido';
+    document.title = cleanName;
   }
 
   // Points

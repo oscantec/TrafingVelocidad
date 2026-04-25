@@ -283,6 +283,14 @@
     .saved-track-item .share-link:hover { text-decoration: underline; }
     .saved-track-item .share-copy { flex-shrink: 0; height: 22px; padding: 0 8px; font-size: 10px; }
 
+    /* 3-up form row inside the start modal — mismo aire que el resto. */
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--sp-sm);
+    }
+    .form-row .form-group { margin-bottom: var(--sp-md); }
+
     /* Back button */
     .back-btn {
       display: inline-flex;
@@ -496,6 +504,36 @@
             <label class="form-label" for="modalTrackName">Nombre del recorrido</label>
             <input type="text" class="form-input" id="modalTrackName"
                    placeholder="Ej: Carrera 7 — tramo norte" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="modalTipo">Tipo de vehículo</label>
+              <select id="modalTipo" class="form-input">
+                <option value="">—</option>
+                <option value="Público">Público</option>
+                <option value="Privado">Privado</option>
+                <option value="TM">TM</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="modalCalzada">Calzada</label>
+              <select id="modalCalzada" class="form-input">
+                <option value="">—</option>
+                <option value="Lenta">Lenta</option>
+                <option value="Rápida">Rápida</option>
+                <option value="Única">Única</option>
+                <option value="Otra">Otra</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="modalPeriodo">Período</label>
+              <select id="modalPeriodo" class="form-input">
+                <option value="">—</option>
+                <option value="AM">AM</option>
+                <option value="PM">PM</option>
+              </select>
+            </div>
           </div>
           <div style="background: var(--warning-dim); padding: 10px 12px; border-radius: var(--r-md); color: var(--text-secondary); font-size: var(--fs-xs); line-height: 1.55;">
             <strong style="color: var(--warning); display:block; margin-bottom:4px;">Captura continua</strong>
