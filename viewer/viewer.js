@@ -409,7 +409,10 @@ async function refreshCloudTracks({ notify = false } = {}) {
         const decoded = decodeTrackName(t.name || 'Recorrido sin nombre');
         const when = fmt(t.start_time);
         const pts  = t.point_count ?? '—';
-        return `<option value="${t.id}">${escapeHtml(decoded.name)} · ${when} · ${pts} pts</option>`;
+        // Tipo + calzada antes del conteo, solo si vienen marcados.
+        const classify = [decoded.tipo, decoded.calzada].filter(Boolean).join(' · ');
+        const parts = [decoded.name, when, classify, `${pts} pts`].filter(Boolean);
+        return `<option value="${t.id}">${escapeHtml(parts.join(' · '))}</option>`;
       }).join('');
   // Preserve the previously selected option when possible.
   if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
