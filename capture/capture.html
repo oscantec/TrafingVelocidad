@@ -291,29 +291,36 @@
     }
     .form-row .form-group { margin-bottom: var(--sp-md); }
 
-    /* Back button */
+    /* App header — grid so the logo stays centered. */
+    .app-header {
+      display: grid !important;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    .app-header > :first-child   { justify-self: start; }
+    .app-header > .header-center { justify-self: center; }
+    .app-header > :last-child    { justify-self: end; }
+
+    /* Solid-orange back button — same look as a btn-primary. */
     .back-btn {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 7px 12px;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--r-md);
-      color: var(--text-secondary);
-      font-size: var(--fs-xs);
-      font-weight: 600;
+      height: 32px; padding: 0 14px;
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--r-sm);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       cursor: pointer;
-      transition: all var(--t-fast);
+      transition: filter var(--t-fast);
       text-decoration: none;
     }
-
-    .back-btn:hover {
-      background: var(--surface);
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
+    .back-btn:hover { filter: brightness(0.95); }
     .back-btn svg { flex-shrink: 0; }
 
     /* Background warning badge */
@@ -358,20 +365,18 @@
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
-      <div class="flex items-center gap-md">
-        <a href="../index.html" class="back-btn" id="btnBackHome" title="Volver al menú principal">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          <span>Inicio</span>
-        </a>
-        <div class="logo">
-          <div class="logo-mark">
-            <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
-          </div>
-          <div class="logo-text logo-text--solo">
-            Captura
-          </div>
+      <a href="../index.html" class="back-btn" id="btnBackHome" title="Volver al menú principal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Inicio</span>
+      </a>
+      <div class="header-center logo">
+        <div class="logo-mark">
+          <img src="../Images/Softrafingvel.png" alt="Softrafing Velocidades">
+        </div>
+        <div class="logo-text logo-text--solo">
+          Captura
         </div>
       </div>
       <div class="flex items-center gap-md">
