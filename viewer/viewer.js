@@ -46,7 +46,9 @@ const $ = (id) => document.getElementById(id);
 const el = {
   trackFileInput: $('trackFileInput'),
   filePickerLabel: $('filePickerLabel'),
+  filePickerHint:  $('filePickerHint'),
   btnLoadFiles:   $('btnLoadFiles'),
+  recorridosEmpty: $('recorridosEmpty'),
   trackUrlInput: $('trackUrlInput'),
   btnLoadUrl: $('btnLoadUrl'),
   cloudTrackSelect: $('cloudTrackSelect'),
@@ -153,7 +155,12 @@ function initMap() {
 function bindEvents() {
   // Track from file — Cargar abre el picker nativo, el label acepta drop
   if (el.trackFileInput) el.trackFileInput.addEventListener('change', handleTrackFileImport);
-  if (el.btnLoadFiles)   el.btnLoadFiles.addEventListener('click', () => el.trackFileInput?.click());
+  if (el.btnLoadFiles)   el.btnLoadFiles.addEventListener('click', (e) => {
+    // Stop the click from bubbling up to the parent <label>, which would
+    // otherwise re-trigger the picker on dismiss.
+    e.preventDefault(); e.stopPropagation();
+    el.trackFileInput?.click();
+  });
   if (el.filePickerLabel) {
     const label = el.filePickerLabel;
     const onDragEnter = (e) => { e.preventDefault(); label.classList.add('is-drop'); };
@@ -323,15 +330,12 @@ async function handleTrackFileImport(event) {
   if (!files.length) return;
 
   // Show which files are in flight on the picker label
-  if (el.filePickerLabel) {
-    const ph = el.filePickerLabel.querySelector('.file-picker-placeholder');
-    if (ph) {
-      ph.textContent = files.length === 1
-        ? files[0].name
-        : `${files.length} archivos seleccionados`;
-    }
-    el.filePickerLabel.classList.add('has-files');
+  if (el.filePickerHint) {
+    el.filePickerHint.textContent = files.length === 1
+      ? files[0].name
+      : `${files.length} archivos seleccionados`;
   }
+  if (el.filePickerLabel) el.filePickerLabel.classList.add('has-files');
 
   let ok = 0, fail = 0;
   for (const file of files) {
@@ -348,11 +352,10 @@ async function handleTrackFileImport(event) {
   // Reset the native <input> so the same files can be re-picked later
   if (event.target && 'value' in event.target) event.target.value = '';
   // Restore the default placeholder after the import settled
-  if (el.filePickerLabel) {
-    const ph = el.filePickerLabel.querySelector('.file-picker-placeholder');
-    if (ph) ph.innerHTML = 'Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong>';
-    el.filePickerLabel.classList.remove('has-files');
+  if (el.filePickerHint) {
+    el.filePickerHint.innerHTML = 'Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong>';
   }
+  el.filePickerLabel?.classList.remove('has-files');
   if (ok) showToast(`Cargado(s) ${ok} recorrido(s)${fail ? ` · ${fail} con error` : ''}`, fail ? 'warning' : 'success');
   else    showToast('No se pudo importar ningún archivo', 'error');
 }
@@ -559,11 +562,13 @@ function addRecorrido({ name, points, sourceUrl = '', cloudId = '',
 function renderRecorridosList() {
   if (!recorridos.length) {
     el.recorridosBox.classList.add('hidden');
+    el.recorridosEmpty?.classList.remove('hidden');
     el.recorridosCount.textContent = '0';
     el.recorridosList.innerHTML = '';
     return;
   }
   el.recorridosBox.classList.remove('hidden');
+  el.recorridosEmpty?.classList.add('hidden');
   el.recorridosCount.textContent = String(recorridos.length);
 
   const fmt = (ts) => new Date(ts).toLocaleString('es', { dateStyle: 'short', timeStyle: 'short' });

@@ -265,10 +265,9 @@
     .track-selector > .form-input,
     .track-selector > input { flex: 1; min-width: 0; }
 
-    /* file picker — styled as a .form-input row so it matches URL + Nube.
-       The real <input type="file"> is hidden via .visually-hidden; the
-       .file-picker <label> acts as the visible field and also catches
-       drag&drop (handled in JS). */
+    /* Import cards — one per source (Archivo, URL, Nube). Same external
+       shape, content adapts: the file row sólo lleva un hint, URL un
+       <input>, Nube un <select> + refresh button. */
     .visually-hidden {
       position: absolute !important;
       width: 1px; height: 1px;
@@ -276,24 +275,94 @@
       overflow: hidden; clip: rect(0, 0, 0, 0);
       white-space: nowrap; border: 0;
     }
-    .file-picker {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center;
-      padding: 0 12px;
-      cursor: pointer;
-      overflow: hidden;
+    .import-card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--ui-sp-3);
+      padding: 12px 14px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r);
+      transition: all 0.15s ease;
+      margin-bottom: var(--ui-sp-3);
+      cursor: default;
     }
-    .file-picker-placeholder {
-      display: block;
-      width: 100%;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      color: var(--ui-ink-3); font-weight: 500;
+    .import-card:last-child { margin-bottom: 0; }
+    .import-card:hover { border-color: var(--ui-ink-3); }
+    .import-card.is-drop { border-color: var(--ui-orange); background: var(--ui-orange-soft); }
+
+    .import-card-icon {
+      width: 36px; height: 36px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: var(--ui-orange-soft);
+      border-radius: var(--ui-r-sm);
+      color: var(--ui-orange);
+      flex-shrink: 0;
     }
-    .file-picker-placeholder strong { color: var(--ui-orange); font-weight: 700; }
-    .file-picker.has-files .file-picker-placeholder {
+    .import-card-icon svg { width: 18px; height: 18px; }
+
+    .import-card-body {
+      display: flex; flex-direction: column;
+      gap: 4px; min-width: 0;
+    }
+    .import-card-label {
+      font-size: var(--fs-label); font-weight: 700;
+      letter-spacing: var(--ls-label); text-transform: uppercase;
       color: var(--ui-ink);
     }
-    .file-picker.is-drop { border-color: var(--ui-orange); background: var(--ui-orange-soft); }
+    .import-card-hint {
+      font-size: var(--fs-meta); font-weight: 500;
+      color: var(--ui-ink-3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .import-card-hint strong { color: var(--ui-orange); font-weight: 700; }
+
+    /* The file card is itself a <label> for the file input; clickable
+       all over and accepts drop targets. */
+    label.import-card { cursor: pointer; }
+    label.import-card:hover { border-color: var(--ui-orange); }
+
+    /* URL / Nube cards: replace the hint with an actual input/select. */
+    .import-card--field .import-card-body { gap: 6px; }
+    .import-card-input {
+      width: 100%;
+      height: var(--h-ctl-sm);
+      padding: 0 10px;
+      background: var(--ui-bg);
+      border: 1px solid var(--ui-line);
+      border-radius: var(--ui-r-sm);
+      color: var(--ui-ink);
+      font-family: inherit;
+      font-size: var(--fs-meta); font-weight: 500;
+      transition: border-color 0.15s ease;
+    }
+    .import-card-input:focus { outline: none; border-color: var(--ui-ink-2); }
+    .import-card-input.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .import-card-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .import-card-row .import-card-input { flex: 1; min-width: 0; }
+    .import-card-side { width: 28px; padding: 0 !important; flex-shrink: 0; }
+
+    .import-card-action { flex-shrink: 0; min-width: 84px; }
+
+    /* Empty state for the loaded recorridos list. */
+    .rec-empty {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 10px;
+      padding: 28px 16px;
+      border: 1px dashed var(--ui-line);
+      border-radius: var(--ui-r);
+      background: var(--ui-bg-alt);
+      color: var(--ui-ink-3);
+    }
+    .rec-empty svg { width: 32px; height: 32px; opacity: 0.55; }
+    .rec-empty p {
+      margin: 0;
+      font-size: var(--fs-meta); font-weight: 500;
+      color: var(--ui-ink-3);
+      text-align: center;
+    }
 
     /* recorridos list cards */
     .rec-list { display: flex; flex-direction: column; gap: var(--ui-sp-3); }
@@ -830,39 +899,69 @@
           <div class="viewer-panel-section">
             <div class="section-header"><h2>Importar recorrido</h2></div>
 
-            <div class="form-group">
-              <label class="form-label">Archivo(s)</label>
-              <div class="track-selector">
-                <label class="form-input file-picker" id="filePickerLabel" for="trackFileInput">
-                  <span class="file-picker-placeholder">Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong></span>
-                </label>
-                <input type="file" multiple accept=".gpx,.json,.kml,.geojson,.xml,.jsp,.txt,.html,.htm" id="trackFileInput" class="visually-hidden">
-                <button class="btn btn-sm btn-primary" id="btnLoadFiles">Cargar</button>
+            <!-- ARCHIVO(S) -->
+            <label class="import-card" id="filePickerLabel" for="trackFileInput">
+              <span class="import-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <path d="M14 2v6h6"/>
+                  <path d="M12 18v-6"/>
+                  <path d="M9 15l3-3 3 3"/>
+                </svg>
+              </span>
+              <div class="import-card-body">
+                <span class="import-card-label">Archivo(s)</span>
+                <span class="import-card-hint" id="filePickerHint">Arrastra o selecciona <strong>.GPX</strong> · <strong>.KML</strong> · <strong>.GeoJSON</strong> · <strong>.JSP</strong></span>
               </div>
+              <button class="btn btn-sm btn-primary import-card-action" id="btnLoadFiles" type="button">Cargar</button>
+              <input type="file" multiple accept=".gpx,.json,.kml,.geojson,.xml,.jsp,.txt,.html,.htm" id="trackFileInput" class="visually-hidden">
+            </label>
+
+            <!-- URL -->
+            <div class="import-card import-card--field">
+              <span class="import-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </span>
+              <div class="import-card-body">
+                <span class="import-card-label">URL</span>
+                <input type="url" id="trackUrlInput" class="import-card-input mono" placeholder="https://…/track.gpx">
+              </div>
+              <button class="btn btn-sm btn-primary import-card-action" id="btnLoadUrl" type="button">Cargar</button>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">URL</label>
-              <div class="track-selector">
-                <input type="url" id="trackUrlInput" class="form-input mono" placeholder="https://…/track.gpx">
-                <button class="btn btn-sm btn-primary" id="btnLoadUrl">Cargar</button>
+            <!-- NUBE -->
+            <div class="import-card import-card--field">
+              <span class="import-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+                  <path d="M12 12v6"/>
+                  <path d="M9 15l3 3 3-3"/>
+                </svg>
+              </span>
+              <div class="import-card-body">
+                <span class="import-card-label">Nube</span>
+                <div class="import-card-row">
+                  <select id="cloudTrackSelect" class="import-card-input">
+                    <option value="">— Selecciona un recorrido guardado —</option>
+                  </select>
+                  <button class="btn btn-sm btn-secondary import-card-side" id="btnRefreshCloud" type="button" title="Refrescar lista">↻</button>
+                </div>
               </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Nube</label>
-              <div class="track-selector">
-                <select id="cloudTrackSelect" class="form-input">
-                  <option value="">— Selecciona un recorrido guardado —</option>
-                </select>
-                <button class="btn btn-sm btn-secondary" id="btnRefreshCloud" title="Refrescar lista">↻</button>
-                <button class="btn btn-sm btn-primary" id="btnLoadCloud">Cargar</button>
-              </div>
+              <button class="btn btn-sm btn-primary import-card-action" id="btnLoadCloud" type="button">Cargar</button>
             </div>
           </div>
 
           <div class="viewer-panel-section">
             <div class="section-header"><h2>Recorridos cargados</h2></div>
+            <div id="recorridosEmpty" class="rec-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              <p>No hay recorridos cargados actualmente</p>
+            </div>
             <div id="recorridosBox" class="hidden">
               <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;">
                 <span class="badge"><span id="recorridosCount">0</span> recorridos</span>

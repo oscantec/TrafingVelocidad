@@ -41,41 +41,51 @@
       overflow-x: auto;
     }
 
-    /* Metrics */
+    /* Metrics — separate cards on a soft surface, no internal gridlines.
+       Numbers grow, labels shrink, units sit below in muted text. */
     .capture-metrics {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 1px;
-      background: var(--border);
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface-alt);
       border-bottom: 1px solid var(--border);
     }
 
     .capture-metric {
       background: var(--surface);
-      padding: var(--sp-md) var(--sp-lg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
       text-align: center;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
     }
 
     .capture-metric .metric-label {
-      font-size: 10px;
+      font-size: 10.5px;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 600;
-      margin-bottom: 2px;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      margin-bottom: 6px;
     }
 
     .capture-metric .metric-value {
       font-family: var(--font-mono);
-      font-size: var(--fs-xl);
+      font-size: 32px;
       font-weight: 700;
-      line-height: 1.2;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
     }
 
     .capture-metric .metric-unit {
-      font-size: var(--fs-xs);
+      display: block;
+      font-size: 11px;
       color: var(--text-muted);
       font-family: var(--font-sans);
+      font-weight: 500;
+      margin-top: 4px;
     }
 
     .capture-metric.highlight .metric-value {
@@ -103,20 +113,75 @@
       height: 100%;
     }
 
-    /* Controls */
+    /* Controls — Reanudar y Pausar como botones outline circulares con
+       label debajo; el REC central queda grande, naranja sólido y con un
+       halo suave para señalar la acción primaria. */
     .capture-controls {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: var(--sp-md);
-      padding: var(--sp-lg) var(--sp-xl);
+      gap: 36px;
+      padding: 18px 20px 22px;
       background: var(--surface);
       border-top: 1px solid var(--border);
     }
 
+    .capture-controls .btn {
+      width: 56px;
+      height: 56px;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      background: var(--surface) !important;
+      border: 1.5px solid var(--border) !important;
+      font-size: 0;
+      position: relative;
+      color: var(--text-secondary) !important;
+      transition: all var(--t-fast);
+    }
+    .capture-controls .btn:not(:disabled):hover {
+      border-color: var(--accent) !important;
+      color: var(--accent) !important;
+    }
+    .capture-controls .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    /* Each Reanudar / Pausar shows its title below as a tiny uppercase
+       caption — we re-create it from the [title] attribute via ::after. */
+    .capture-controls .btn::before {
+      content: '';
+      width: 18px; height: 18px;
+      display: inline-block;
+      background: currentColor;
+      -webkit-mask-position: center; mask-position: center;
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-size: contain; mask-size: contain;
+    }
+    .capture-controls #btnResume::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+              mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+    }
+    .capture-controls #btnPause::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='5' width='4' height='14' rx='1' fill='black'/%3E%3Crect x='14' y='5' width='4' height='14' rx='1' fill='black'/%3E%3C/svg%3E");
+              mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6' y='5' width='4' height='14' rx='1' fill='black'/%3E%3Crect x='14' y='5' width='4' height='14' rx='1' fill='black'/%3E%3C/svg%3E");
+    }
+    .capture-controls .btn::after {
+      content: attr(title);
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
     .btn-record {
-      width: 70px;
-      height: 70px;
+      width: 76px;
+      height: 76px;
       border-radius: 50%;
       background: var(--accent);
       color: #fff;
@@ -127,30 +192,25 @@
       transition: all var(--t-fast);
       border: 3px solid transparent;
       position: relative;
-      box-shadow: var(--shadow-md);
+      box-shadow: 0 0 0 6px var(--accent-glow);
     }
 
-    .btn-record::after {
-      display: none;
-    }
+    .btn-record::after { display: none; }
 
     .btn-record:hover {
       transform: scale(1.05);
-      box-shadow: var(--shadow-lg), 0 0 0 6px var(--accent-glow);
+      box-shadow: 0 0 0 8px var(--accent-glow);
     }
-
-    .btn-record:active {
-      transform: scale(0.95);
-    }
-
+    .btn-record:active { transform: scale(0.95); }
     .btn-record.recording {
       background: var(--danger);
+      box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.18);
       animation: recording-pulse 1.5s ease-in-out infinite;
     }
 
     .btn-record .rec-icon {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       background: white;
       border-radius: 50%;
       transition: all var(--t-fast);
@@ -192,7 +252,8 @@
       box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
-    /* GPS Error overlay */
+    /* GPS Error overlay — card with red top border, location-off icon
+       on top, polished button. */
     .gps-error-overlay {
       position: absolute;
       top: 50%;
@@ -200,24 +261,48 @@
       transform: translate(-50%, -50%);
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--r-lg);
-      padding: var(--sp-2xl);
+      border-radius: 16px;
+      padding: 22px 26px;
       text-align: center;
       z-index: 1000;
-      max-width: 340px;
-      box-shadow: var(--shadow-lg);
+      max-width: 360px;
+      box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
+      overflow: hidden;
     }
-
+    .gps-error-overlay::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--danger);
+    }
+    .gps-error-overlay::after {
+      content: '';
+      display: block;
+      width: 44px; height: 44px;
+      margin: 4px auto 14px;
+      background: var(--danger);
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.46 9.46L21 10c0 7-9 13-9 13s-3.71-2.5-6.5-6.5'/%3E%3Cpath d='M5.5 5.5C3.97 7.07 3 9 3 11c0 1.31.32 2.55.85 3.66'/%3E%3Cline x1='1' y1='1' x2='23' y2='23'/%3E%3C/svg%3E");
+              mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.46 9.46L21 10c0 7-9 13-9 13s-3.71-2.5-6.5-6.5'/%3E%3Cpath d='M5.5 5.5C3.97 7.07 3 9 3 11c0 1.31.32 2.55.85 3.66'/%3E%3Cline x1='1' y1='1' x2='23' y2='23'/%3E%3C/svg%3E");
+      -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+      -webkit-mask-position: center; mask-position: center;
+      -webkit-mask-size: contain; mask-size: contain;
+    }
     .gps-error-overlay h3 {
-      color: var(--danger);
-      margin-bottom: var(--sp-md);
+      color: var(--text-primary);
+      font-size: 16px; font-weight: 700;
+      margin: 0 0 8px;
     }
-
     .gps-error-overlay p {
       color: var(--text-secondary);
-      font-size: var(--fs-sm);
-      margin-bottom: var(--sp-lg);
-      line-height: 1.6;
+      font-size: 12.5px; font-weight: 500;
+      margin: 0 0 18px;
+      line-height: 1.55;
+    }
+    .gps-error-overlay .btn {
+      height: 36px;
+      border-radius: 999px;
+      padding: 0 22px;
     }
 
     /* Tracks List */
