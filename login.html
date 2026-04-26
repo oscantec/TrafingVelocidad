@@ -203,8 +203,8 @@
       sessionStorage.removeItem('returnTo');
       window.location.href = returnTo;
     } catch (err) {
-      if (err && err.code === 'no_role') {
-        errorMsg.textContent = 'Tu cuenta no tiene acceso a esta aplicación.';
+      if (err && err.code === 'no_access') {
+        errorMsg.textContent = err.message || 'Tu cuenta no tiene acceso a este módulo.';
       } else {
         errorMsg.textContent = 'Correo o contraseña incorrectos.';
       }
