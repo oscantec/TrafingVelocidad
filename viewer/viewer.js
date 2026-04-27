@@ -107,8 +107,48 @@ const el = {
   btnClearRecorridos: $('btnClearRecorridos'),
 };
 
+// ── Leave guards ─────────────────────────────────────────────
+// Evita perder el trabajo no guardado por accidente: cierre de pestaña,
+// recarga, atrás del navegador o click en el botón "Inicio".
+//
+// Instalado a nivel de módulo (no dentro de init) para que el listener
+// exista incluso si la inicialización falla o si el usuario cierra muy
+// pronto. Y antes de cualquier `await` en init().
+function hasWorkInProgress() {
+  return referenceNodes.length > 0 || recorridos.length > 0 || subtramos.length > 0;
+}
+
+// 1) Cierre de pestaña / recarga / navegación externa: prompt nativo.
+//    Importante: returnValue debe ser una cadena NO vacía + return de la
+//    misma cadena para que Safari/Firefox legacy también disparen.
+window.addEventListener('beforeunload', (e) => {
+  if (!hasWorkInProgress()) return undefined;
+  const msg = 'Tienes trabajo sin guardar (nodos, recorridos o subtramos).';
+  e.preventDefault();
+  e.returnValue = msg;
+  return msg;
+});
+
+// 3) Botón "Atrás" del navegador. Empujamos un estado dummy ya mismo;
+//    en popstate pedimos confirmación y, si cancela, lo re-empujamos.
+try {
+  history.pushState({ guard: true }, '');
+  window.addEventListener('popstate', () => {
+    if (!hasWorkInProgress()) return;
+    if (confirm('Tienes trabajo sin guardar. ¿Salir de la página?')) {
+      history.back();
+    } else {
+      history.pushState({ guard: true }, '');
+    }
+  });
+} catch {}
+
 // ── Initialize ───────────────────────────────────────────────
 async function init() {
+  // Botón "Inicio" en la cabecera: lo enganchamos primero, antes de
+  // cualquier await, así existe aunque openDB falle o tarde.
+  installBackHomeGuard();
+
   try {
     await openDB();
   } catch (err) {
@@ -121,49 +161,17 @@ async function init() {
   refreshTramos();
   refreshCloudTracks();
   renderSubtramosTable();
-  installLeaveGuards();
 }
 
-// ── Leave guards ─────────────────────────────────────────────
-// Evita perder el trabajo no guardado por accidente: cierre de pestaña,
-// recarga, atrás del navegador o click en el botón "Inicio".
-function hasWorkInProgress() {
-  return referenceNodes.length > 0 || recorridos.length > 0 || subtramos.length > 0;
-}
-
-function installLeaveGuards() {
-  // 1) Cierre de pestaña / recarga / navegación externa: prompt nativo.
-  window.addEventListener('beforeunload', (e) => {
-    if (!hasWorkInProgress()) return;
-    e.preventDefault();
-    // El texto se ignora en navegadores modernos (muestran su mensaje
-    // estándar), pero hay que setear returnValue para que dispare.
-    e.returnValue = '';
-  });
-
-  // 2) Botón "Inicio" en la cabecera: confirm() en español.
-  const back = $('btnBackHome');
-  if (back) back.addEventListener('click', (e) => {
+function installBackHomeGuard() {
+  const back = document.getElementById('btnBackHome');
+  if (!back) return;
+  back.addEventListener('click', (e) => {
     if (!hasWorkInProgress()) return;
     if (!confirm('Tienes trabajo sin guardar (nodos, recorridos o subtramos). ¿Salir al inicio de todos modos?')) {
       e.preventDefault();
     }
   });
-
-  // 3) Botón "Atrás" del navegador: empujamos un estado dummy y, si el
-  //    usuario hace pop, le pedimos confirmación. Si cancela, volvemos
-  //    a empujar el estado para mantenernos en la página.
-  try {
-    history.pushState({ guard: true }, '');
-    window.addEventListener('popstate', () => {
-      if (!hasWorkInProgress()) return;
-      if (confirm('Tienes trabajo sin guardar. ¿Salir de la página?')) {
-        history.back();
-      } else {
-        history.pushState({ guard: true }, '');
-      }
-    });
-  } catch {}
 }
 
 // ── Design tokens (read from CSS so the palette lives in one place) ──
