@@ -846,6 +846,9 @@ function toggleDrawingMode() {
   el.drawingHint.classList.toggle('hidden', !drawingMode);
   const container = map.getContainer();
   container.style.cursor = drawingMode ? 'crosshair' : '';
+  // Rebuild markers so their `interactive` flag matches the new mode —
+  // off while drawing (clicks fall through to the map), on otherwise.
+  drawNodeMarkers(referenceNodes);
 }
 
 function handleMapClickForDrawing(e) {
@@ -1094,19 +1097,25 @@ function drawNodeMarkers(nodes) {
   nodeMarkers.forEach((m) => map.removeLayer(m));
   nodeMarkers = [];
 
-  nodes.forEach((node) => {
+  nodes.forEach((node, i) => {
     const icon = L.divIcon({
       className: '',
-      html: `<div class="map-node-mark">${node.id}</div>`,
+      html: `<div class="map-node-mark">${i + 1}</div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     });
 
-    const marker = L.marker([node.lat, node.lng], { icon })
+    const marker = L.marker([node.lat, node.lng], {
+      icon,
+      // While the user is drawing new points, let clicks pass through to the
+      // map so they always create a new node instead of opening this marker's
+      // popup. Toggle off as soon as drawing mode ends.
+      interactive: !drawingMode,
+    })
       .bindPopup(`
         <div class="map-popup map-popup-readout">
           <div class="map-popup-title">${escapeHtml(node.name)}</div>
-          <div class="map-popup-sub">ID ${node.id}</div>
+          <div class="map-popup-sub">#${i + 1}</div>
           <div class="map-popup-coords">${node.lat.toFixed(6)}, ${node.lng.toFixed(6)}</div>
         </div>
       `)
