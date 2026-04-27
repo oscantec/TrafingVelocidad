@@ -10,7 +10,8 @@ import {
   formatDistance, formatDuration, formatSpeed, generateSegmentColors,
   findNodeCrossings, directionLabel,
 } from '../lib/geo.js';
-import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
+import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText,
+         generateGPX, downloadGPX } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, createCorridor, listControlPointsByTramo,
          listSubtramosByTramo,
@@ -105,6 +106,7 @@ const el = {
   recorridosCount: $('recorridosCount'),
   recorridosList:  $('recorridosList'),
   btnClearRecorridos: $('btnClearRecorridos'),
+  btnDownloadAllRecorridos: $('btnDownloadAllRecorridos'),
 };
 
 // ── Leave guards ─────────────────────────────────────────────
@@ -244,6 +246,7 @@ function bindEvents() {
 
   // Recorridos list — clear all
   if (el.btnClearRecorridos) el.btnClearRecorridos.addEventListener('click', clearRecorridos);
+  if (el.btnDownloadAllRecorridos) el.btnDownloadAllRecorridos.addEventListener('click', downloadAllRecorridosAsZip);
 
   // Nodes from file
   // Tramificación
@@ -704,6 +707,7 @@ function renderRecorridosList() {
         </div>
         <div class="rec-actions">
           <button class="btn btn-sm btn-primary" data-view${viewDisabled}>${viewLabel}</button>
+          <button class="btn btn-sm btn-secondary" data-download title="Descargar GPX">Descargar</button>
           <button class="btn btn-sm btn-secondary" data-remove>Quitar</button>
         </div>
       </div>`;
@@ -719,6 +723,13 @@ function renderRecorridosList() {
     btn.addEventListener('click', (ev) => {
       const row = ev.currentTarget.closest('[data-id]');
       if (row) removeRecorrido(row.dataset.id);
+    });
+  });
+  el.recorridosList.querySelectorAll('[data-download]').forEach((btn) => {
+    btn.addEventListener('click', (ev) => {
+      const row = ev.currentTarget.closest('[data-id]');
+      const rec = row && recorridos.find((r) => r.id === row.dataset.id);
+      if (rec) downloadRecorridoAsGpx(rec);
     });
   });
   el.recorridosList.querySelectorAll('[data-share]').forEach((btn) => {
@@ -779,6 +790,82 @@ function clearRecorridos() {
   if (baseTrackLayer) { map.removeLayer(baseTrackLayer); baseTrackLayer = null; }
   if (baseTrackDecorator) { map.removeLayer(baseTrackDecorator); baseTrackDecorator = null; }
   updateProcessButton();
+}
+
+// ── Descarga local de recorridos ─────────────────────────────
+// Genera un nombre de archivo seguro con fecha + nombre slugificado.
+function gpxFilenameFor(rec) {
+  const d = new Date(rec.startTs || Date.now());
+  const p = (n) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+  const slug = String(rec.name || 'recorrido')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60) || 'recorrido';
+  return `${stamp}_${slug}.gpx`;
+}
+
+function downloadRecorridoAsGpx(rec) {
+  if (!rec || !rec.points || rec.points.length === 0) {
+    showToast('Recorrido sin puntos para exportar', 'warning');
+    return;
+  }
+  try {
+    const gpx = generateGPX(rec.name || 'Recorrido', rec.points);
+    downloadGPX(gpx, gpxFilenameFor(rec));
+  } catch (err) {
+    showToast(`Error al generar GPX: ${err.message}`, 'error');
+  }
+}
+
+async function downloadAllRecorridosAsZip() {
+  if (!recorridos.length) {
+    showToast('No hay recorridos para descargar', 'warning');
+    return;
+  }
+  if (typeof JSZip === 'undefined') {
+    showToast('La librería ZIP aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  const btn = el.btnDownloadAllRecorridos;
+  if (btn) { btn.disabled = true; btn.textContent = 'Empaquetando…'; }
+  try {
+    const zip = new JSZip();
+    // Evita colisiones de nombre cuando dos recorridos comparten timestamp.
+    const used = new Set();
+    for (const rec of recorridos) {
+      let fname = gpxFilenameFor(rec);
+      if (used.has(fname)) {
+        const base = fname.replace(/\.gpx$/, '');
+        let i = 2;
+        while (used.has(`${base}_${i}.gpx`)) i++;
+        fname = `${base}_${i}.gpx`;
+      }
+      used.add(fname);
+      zip.file(fname, generateGPX(rec.name || 'Recorrido', rec.points));
+    }
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const stamp = (() => {
+      const d = new Date();
+      const p = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+    })();
+    a.href = url;
+    a.download = `Recorridos_${stamp}.zip`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+    showToast(`ZIP con ${recorridos.length} recorrido(s) descargado`, 'success');
+  } catch (err) {
+    console.error('[zip]', err);
+    showToast(`Error al armar ZIP: ${err.message}`, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Descargar todos (ZIP)'; }
+  }
 }
 
 function loadTrackData(points) {

@@ -24,6 +24,7 @@
 
   <!-- xlsx-js-style (SheetJS fork with cell styles) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="manifest" href="../manifest.webmanifest">
@@ -970,9 +971,12 @@
               <p>No hay recorridos cargados actualmente</p>
             </div>
             <div id="recorridosBox" class="hidden">
-              <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;">
+              <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;flex-wrap:wrap;">
                 <span class="badge"><span id="recorridosCount">0</span> recorridos</span>
-                <button class="btn btn-sm btn-secondary" id="btnClearRecorridos">Vaciar</button>
+                <div class="btn-group" style="gap:6px;flex-wrap:wrap;">
+                  <button class="btn btn-sm btn-secondary" id="btnDownloadAllRecorridos" title="Descargar todos los recorridos como GPX comprimido en ZIP">Descargar todos (ZIP)</button>
+                  <button class="btn btn-sm btn-secondary" id="btnClearRecorridos">Vaciar</button>
+                </div>
               </div>
               <div class="rec-list" id="recorridosList"></div>
             </div>
