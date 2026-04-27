@@ -715,6 +715,7 @@ function loadTrackData(points) {
 let drawingMode = false;
 let tramosCache = [];      // [{id, name, corridor_id, corridors:{id, name}}]
 let corridorsCache = [];   // [{id, name}]
+let activeCorridorId = null; // corredor preseleccionado en el popup de añadir nodo
 
 const TRAMIFICATION_SETUP_SQL = `create table if not exists public.corridors (
   id         uuid primary key default gen_random_uuid(),
@@ -789,16 +790,38 @@ function displayCorredores() {
   if (!corridorsCache.length) {
     el.corredoresInfo.classList.add('hidden');
     el.corredoresList.innerHTML = '';
+    activeCorridorId = null;
     return;
+  }
+  // Si el activo dejó de existir (lo borraron en otra sesión), límpialo.
+  if (activeCorridorId && !corridorsCache.some((c) => c.id === activeCorridorId)) {
+    activeCorridorId = null;
   }
   el.corredoresInfo.classList.remove('hidden');
   el.corredoresCount.textContent = corridorsCache.length;
-  el.corredoresList.innerHTML = corridorsCache.map((c) => `
-    <div class="node-item">
-      <div style="flex:1;min-width:0;">
-        <span class="node-name">${escapeHtml(c.name)}</span>
-      </div>
-    </div>`).join('');
+  el.corredoresList.innerHTML = corridorsCache.map((c) => {
+    const isActive = c.id === activeCorridorId;
+    const activeMark = isActive
+      ? '<span class="node-flag" style="background:var(--ui-orange);color:#fff;border-color:var(--ui-orange);">activo</span>'
+      : '';
+    const rowStyle = isActive
+      ? 'cursor:pointer;background:var(--ui-orange-soft);border:1px solid var(--ui-orange);'
+      : 'cursor:pointer;border:1px solid transparent;';
+    return `
+      <div class="node-item" data-corredor-id="${escapeHtml(c.id)}" style="${rowStyle}">
+        <div style="flex:1;min-width:0;">
+          <span class="node-name">${escapeHtml(c.name)} ${activeMark}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.corredoresList.querySelectorAll('[data-corredor-id]').forEach((row) => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.corredorId;
+      activeCorridorId = (activeCorridorId === id) ? null : id;
+      displayCorredores();
+    });
+  });
 }
 
 async function handleAddCorredor() {
@@ -825,6 +848,8 @@ async function handleAddCorredor() {
   // Refresh cache + UI (lists, dropdowns inside the create-node popup, etc.)
   const cRes = await listCorridors();
   corridorsCache = cRes.ok ? cRes.corridors : corridorsCache;
+  // Dejar activo el corredor recién creado/seleccionado para encadenar nodos.
+  if (res.corridor && res.corridor.id) activeCorridorId = res.corridor.id;
   displayCorredores();
 }
 
@@ -912,9 +937,14 @@ function openNodeNamePopup(latlng, defaultName) {
   const corridorOpts = corridorsCache.map((c) =>
     `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`
   ).join('');
+  // Preferir el corredor activo (seleccionado en la sección Corredores);
+  // si no hay, tomar el del último nodo creado para encadenar mismo corredor.
   const lastUsed = referenceNodes.length
     ? referenceNodes[referenceNodes.length - 1].corridorId
     : '';
+  const preselect = (activeCorridorId && corridorsCache.some((c) => c.id === activeCorridorId))
+    ? activeCorridorId
+    : lastUsed;
 
   wrap.innerHTML = `
     <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
@@ -937,8 +967,8 @@ function openNodeNamePopup(latlng, defaultName) {
   const cancel   = wrap.querySelector('.np-cancel');
   const corrSel  = wrap.querySelector('.np-corridor');
   input.value = defaultName;
-  if (lastUsed && corridorsCache.some((c) => c.id === lastUsed)) {
-    corrSel.value = lastUsed;
+  if (preselect && corridorsCache.some((c) => c.id === preselect)) {
+    corrSel.value = preselect;
   }
 
   const popup = L.popup({ closeButton: false, autoClose: true, closeOnClick: false })
