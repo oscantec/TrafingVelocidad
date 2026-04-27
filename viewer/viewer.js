@@ -761,7 +761,26 @@ let tramosCache = [];      // [{id, name, corridor_id, corridors:{id, name}}]
 let corridorsCache = [];   // [{id, name}]
 let activeCorridorId = null; // corredor preseleccionado en el popup de añadir nodo
 
-const TRAMIFICATION_SETUP_SQL = `create table if not exists public.corridors (
+const TRAMIFICATION_SETUP_SQL = `-- ═══════════════════════════════════════════════════════════
+--  Migración v2 (corredor por nodo)
+--  Estas dos sentencias actualizan deployments anteriores; pueden
+--  ejecutarse aunque las tablas no existan todavía (las crea el
+--  bloque siguiente). Son idempotentes.
+-- ═══════════════════════════════════════════════════════════
+do $$ begin
+  if exists (select 1 from information_schema.columns
+             where table_schema='public' and table_name='tramos' and column_name='corridor_id') then
+    alter table public.tramos alter column corridor_id drop not null;
+  end if;
+end $$;
+
+alter table if exists public.control_points
+  add column if not exists corridor_id uuid references public.corridors(id) on delete set null;
+
+-- ═══════════════════════════════════════════════════════════
+--  Esquema base
+-- ═══════════════════════════════════════════════════════════
+create table if not exists public.corridors (
   id         uuid primary key default gen_random_uuid(),
   name       text not null unique,
   created_at timestamptz default now()
@@ -773,7 +792,6 @@ create table if not exists public.tramos (
   name        text not null,
   created_at  timestamptz default now()
 );
-alter table public.tramos alter column corridor_id drop not null;
 
 create table if not exists public.control_points (
   id          uuid primary key default gen_random_uuid(),
@@ -785,8 +803,6 @@ create table if not exists public.control_points (
   seq         integer default 0,
   created_at  timestamptz default now()
 );
-alter table public.control_points
-  add column if not exists corridor_id uuid references public.corridors(id) on delete set null;
 
 create table if not exists public.subtramos (
   id         uuid primary key default gen_random_uuid(),
