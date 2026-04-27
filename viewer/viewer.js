@@ -1850,12 +1850,16 @@ function computeExportRows() {
     const hits = subtramoRowsForRecorrido(rec, threshold);
     for (const h of hits) {
       const matched = h.matched;
+      // CORREDOR del subtramo: derivado de los corredores de sus nodos extremos
+      // (deben coincidir; si un extremo es Inicio/Fin se hereda del otro). Si
+      // no se puede derivar, usar el corredor global del estudio (Tracks).
+      const subtramoCorr = subtramoCorridorName(h.subtramo) || study.corredor;
       rows.push([
         upperOrBlank(diaClasificacion(rec.startTs)),
         upperOrBlank(fechaLargaEs(rec.startTs)),
         upperOrBlank(rec.periodo),
         rec.sourceUrl || '',
-        upperOrBlank(study.corredor),
+        upperOrBlank(subtramoCorr),
         upperOrBlank(`${resolveNodeName(h.subtramo.startNodeId)} - ${resolveNodeName(h.subtramo.endNodeId)}`),
         upperOrBlank(rec.calzada),
         upperOrBlank(rec.tipo),
