@@ -68,29 +68,38 @@ create table if not exists public.corridors (
   created_at timestamptz default now()
 );
 
--- 2) Tramo (ej. "Caracas — Norte") pertenece a un corredor
+-- 2) Tramo (ahora "circuito") puede tocar varios corredores; corridor_id
+--    se conserva como legacy y queda nullable.
 create table if not exists public.tramos (
   id           uuid primary key default gen_random_uuid(),
-  corridor_id  uuid not null references public.corridors(id) on delete cascade,
+  corridor_id  uuid references public.corridors(id) on delete set null,
   name         text not null,
-  created_at   timestamptz default now(),
-  unique (corridor_id, name)
+  created_at   timestamptz default now()
 );
+
+-- Migración para deployments anteriores donde corridor_id era NOT NULL.
+alter table public.tramos alter column corridor_id drop not null;
 
 create index if not exists idx_tramos_corridor on public.tramos (corridor_id);
 
--- 3) Puntos de control, ordenados dentro de un tramo
+-- 3) Puntos de control: cada nodo lleva su propio corredor de análisis.
 create table if not exists public.control_points (
-  id         uuid primary key default gen_random_uuid(),
-  tramo_id   uuid not null references public.tramos(id) on delete cascade,
-  name       text not null,
-  lat        double precision not null,
-  lng        double precision not null,
-  seq        integer default 0,
-  created_at timestamptz default now()
+  id          uuid primary key default gen_random_uuid(),
+  tramo_id    uuid not null references public.tramos(id) on delete cascade,
+  corridor_id uuid references public.corridors(id) on delete set null,
+  name        text not null,
+  lat         double precision not null,
+  lng         double precision not null,
+  seq         integer default 0,
+  created_at  timestamptz default now()
 );
 
-create index if not exists idx_control_points_tramo on public.control_points (tramo_id, seq);
+-- Migración para deployments anteriores sin esta columna.
+alter table public.control_points
+  add column if not exists corridor_id uuid references public.corridors(id) on delete set null;
+
+create index if not exists idx_control_points_tramo    on public.control_points (tramo_id, seq);
+create index if not exists idx_control_points_corridor on public.control_points (corridor_id);
 
 alter table public.corridors      enable row level security;
 alter table public.tramos         enable row level security;

@@ -973,13 +973,33 @@
           </div>
         </div>
 
-        <!-- Tab 3: NODOS — puntos de control + subtramos -->
+        <!-- Tab 3: NODOS — corredores + puntos de control + subtramos -->
         <div class="tab-content" id="tab-nodos">
+          <div class="viewer-panel-section">
+            <div class="section-header"><h2>Corredores</h2></div>
+            <p class="text-xs text-muted" style="margin-bottom:10px;line-height:1.5;">
+              Catálogo global. Cada nodo se asigna a uno de estos corredores al crearlo.
+            </p>
+            <div class="form-group">
+              <div class="track-selector">
+                <input type="text" id="corredorNameInput" class="form-input"
+                       placeholder="Nombre del corredor" autocomplete="off">
+                <button class="btn btn-sm btn-primary" id="btnAddCorredor">Adicionar</button>
+              </div>
+            </div>
+            <div id="corredoresInfo" class="hidden">
+              <div class="flex items-center mb-md" style="justify-content:space-between;gap:8px;">
+                <span class="badge"><span id="corredoresCount">0</span> corredores</span>
+              </div>
+              <div class="nodes-list" id="corredoresList"></div>
+            </div>
+          </div>
+
           <div class="viewer-panel-section">
             <div class="section-header"><h2>Puntos de control</h2></div>
 
             <div class="form-group">
-              <label class="form-label">Cargar tramo guardado</label>
+              <label class="form-label">Cargar circuito guardado</label>
               <div class="track-selector">
                 <select id="savedTramoSelect"><option value="">— Seleccionar —</option></select>
                 <button class="btn btn-sm btn-secondary" id="btnRefreshTramos">Refrescar</button>
@@ -989,7 +1009,7 @@
             <div class="form-group">
               <button class="btn btn-primary w-full" id="btnDrawPoints">Dibujar en mapa</button>
               <div id="drawingHint" class="hidden" style="margin-top:8px;padding:8px 10px;background:var(--ui-orange-soft);color:var(--ui-orange);border-radius:var(--ui-r-sm);font-size:var(--fs-meta);font-weight:600;line-height:1.5;">
-                Haz clic en el mapa para añadir un punto. Al final pulsa <strong>Guardar tramo</strong>.
+                Haz clic en el mapa para añadir un punto. Al final pulsa <strong>Guardar circuito</strong>.
               </div>
             </div>
 
@@ -1039,7 +1059,7 @@
             </div>
             <button class="btn btn-sm btn-secondary w-full hidden" id="btnProcess" style="margin-top:10px;">Segmentar track</button>
 
-            <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:16px;">Guardar tramo + subtramos</button>
+            <button class="btn btn-primary w-full" id="btnSaveTramo" style="margin-top:16px;">Guardar circuito + subtramos</button>
           </div>
         </div>
 
@@ -1174,27 +1194,19 @@
       </div>
     </div>
 
-    <!-- Save tramo modal -->
+    <!-- Save circuito modal -->
     <div class="modal-overlay" id="saveTramoModal">
       <div class="modal" style="max-width:460px;">
-        <div class="modal-title">Guardar tramo</div>
+        <div class="modal-title">Guardar circuito</div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">Corredor</label>
-            <select id="stCorridor" class="form-input">
-              <option value="__new__">✚ Nuevo corredor…</option>
-            </select>
-            <input type="text" id="stCorridorNew" class="form-input"
-                   placeholder="Nombre del nuevo corredor"
-                   style="margin-top:6px;" autocomplete="off">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nombre del tramo</label>
+            <label class="form-label">Nombre del circuito</label>
             <input type="text" id="stTramoName" class="form-input"
-                   placeholder="Ej: Caracas — Norte" autocomplete="off">
+                   placeholder="Ej: Circuito Norte" autocomplete="off">
           </div>
           <div class="text-xs text-muted">
             Se guardarán <strong id="stCount">0</strong> puntos en la nube.
+            Cada nodo conserva su corredor de análisis.
           </div>
         </div>
         <div class="modal-actions">

@@ -12,7 +12,7 @@ import {
 } from '../lib/geo.js';
 import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, readFileAsText } from '../lib/gpx.js';
 import { listCloudTracks, getCloudTrackPoints, testConnection,
-         listTramos, listCorridors, listControlPointsByTramo,
+         listTramos, listCorridors, createCorridor, listControlPointsByTramo,
          listSubtramosByTramo,
          saveTramoComplete, deleteTramo,
          buildTrackShareUrl, decodeTrackName } from '../lib/supabase.js';
@@ -66,12 +66,16 @@ const el = {
   cpSetupClose:      $('cpSetupClose'),
   cpSetupRetry:      $('cpSetupRetry'),
   saveTramoModal:    $('saveTramoModal'),
-  stCorridor:        $('stCorridor'),
-  stCorridorNew:     $('stCorridorNew'),
   stTramoName:       $('stTramoName'),
   stCount:           $('stCount'),
   stSave:            $('stSave'),
   stCancel:          $('stCancel'),
+  // Corredores section (Nodos tab)
+  corredorNameInput: $('corredorNameInput'),
+  btnAddCorredor:    $('btnAddCorredor'),
+  corredoresInfo:    $('corredoresInfo'),
+  corredoresCount:   $('corredoresCount'),
+  corredoresList:    $('corredoresList'),
   thresholdInput: $('thresholdInput'),
   btnProcess: $('btnProcess'),
   processBadge: $('processBadge'),
@@ -217,16 +221,17 @@ function bindEvents() {
     await refreshTramos();
   });
 
-  // Save tramo modal
+  // Save circuito modal
   el.stSave.addEventListener('click', handleSaveTramoSubmit);
   el.stCancel.addEventListener('click', () => el.saveTramoModal.classList.remove('active'));
-  el.stCorridor.addEventListener('change', () => {
-    const showNew = el.stCorridor.value === '__new__';
-    el.stCorridorNew.style.display = showNew ? 'block' : 'none';
-    if (showNew) el.stCorridorNew.focus();
-  });
   el.saveTramoModal.addEventListener('click', (e) => {
     if (e.target === el.saveTramoModal) el.saveTramoModal.classList.remove('active');
+  });
+
+  // Corredores (catálogo global)
+  if (el.btnAddCorredor) el.btnAddCorredor.addEventListener('click', handleAddCorredor);
+  if (el.corredorNameInput) el.corredorNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleAddCorredor(); }
   });
 
   // Process (segmentación visual del recorrido activo)
@@ -719,21 +724,24 @@ const TRAMIFICATION_SETUP_SQL = `create table if not exists public.corridors (
 
 create table if not exists public.tramos (
   id          uuid primary key default gen_random_uuid(),
-  corridor_id uuid not null references public.corridors(id) on delete cascade,
+  corridor_id uuid references public.corridors(id) on delete set null,
   name        text not null,
-  created_at  timestamptz default now(),
-  unique (corridor_id, name)
+  created_at  timestamptz default now()
 );
+alter table public.tramos alter column corridor_id drop not null;
 
 create table if not exists public.control_points (
-  id         uuid primary key default gen_random_uuid(),
-  tramo_id   uuid not null references public.tramos(id) on delete cascade,
-  name       text not null,
-  lat        double precision not null,
-  lng        double precision not null,
-  seq        integer default 0,
-  created_at timestamptz default now()
+  id          uuid primary key default gen_random_uuid(),
+  tramo_id    uuid not null references public.tramos(id) on delete cascade,
+  corridor_id uuid references public.corridors(id) on delete set null,
+  name        text not null,
+  lat         double precision not null,
+  lng         double precision not null,
+  seq         integer default 0,
+  created_at  timestamptz default now()
 );
+alter table public.control_points
+  add column if not exists corridor_id uuid references public.corridors(id) on delete set null;
 
 create table if not exists public.subtramos (
   id         uuid primary key default gen_random_uuid(),
@@ -773,32 +781,66 @@ async function refreshTramos() {
   tramosCache = tRes.tramos;
   corridorsCache = cRes.ok ? cRes.corridors : [];
   renderTramoDropdown();
+  displayCorredores();
+}
+
+function displayCorredores() {
+  if (!el.corredoresInfo || !el.corredoresList) return;
+  if (!corridorsCache.length) {
+    el.corredoresInfo.classList.add('hidden');
+    el.corredoresList.innerHTML = '';
+    return;
+  }
+  el.corredoresInfo.classList.remove('hidden');
+  el.corredoresCount.textContent = corridorsCache.length;
+  el.corredoresList.innerHTML = corridorsCache.map((c) => `
+    <div class="node-item">
+      <div style="flex:1;min-width:0;">
+        <span class="node-name">${escapeHtml(c.name)}</span>
+      </div>
+    </div>`).join('');
+}
+
+async function handleAddCorredor() {
+  const name = (el.corredorNameInput.value || '').trim();
+  if (!name) {
+    showToast('Ingresa el nombre del corredor', 'warning');
+    el.corredorNameInput.focus();
+    return;
+  }
+  el.btnAddCorredor.disabled = true;
+  const res = await createCorridor(name);
+  el.btnAddCorredor.disabled = false;
+  if (!res.ok) {
+    if (res.missing) { el.cpSetupModal.classList.add('active'); return; }
+    showToast(`Error: ${res.error}`, 'error');
+    return;
+  }
+  if (res.duplicate) {
+    showToast(`"${name}" ya existe`, 'warning');
+  } else {
+    showToast(`Corredor "${name}" creado`, 'success');
+  }
+  el.corredorNameInput.value = '';
+  // Refresh cache + UI (lists, dropdowns inside the create-node popup, etc.)
+  const cRes = await listCorridors();
+  corridorsCache = cRes.ok ? cRes.corridors : corridorsCache;
+  displayCorredores();
 }
 
 function renderTramoDropdown() {
   const sel = el.savedTramoSelect;
   sel.innerHTML = '<option value="">— Seleccionar —</option>';
   if (tramosCache.length === 0) {
-    sel.innerHTML += '<option disabled>(sin tramos guardados)</option>';
+    sel.innerHTML += '<option disabled>(sin circuitos guardados)</option>';
     return;
   }
-  // Group tramos by corridor name
-  const byCorridor = new Map();
+  // Flat list — el circuito ya no pertenece a un solo corredor.
   for (const t of tramosCache) {
-    const cname = t.corridors?.name || 'Sin corredor';
-    if (!byCorridor.has(cname)) byCorridor.set(cname, []);
-    byCorridor.get(cname).push(t);
-  }
-  for (const [cname, list] of [...byCorridor.entries()].sort()) {
-    const group = document.createElement('optgroup');
-    group.label = cname;
-    for (const t of list) {
-      const opt = document.createElement('option');
-      opt.value = t.id;
-      opt.textContent = t.name;
-      group.appendChild(opt);
-    }
-    sel.appendChild(group);
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
   }
 }
 
@@ -812,6 +854,7 @@ async function handleTramoSelect() {
   }
   const nodes = (res.points || []).map((p) => ({
     id: p.id, name: p.name, lat: +p.lat, lng: +p.lng, cloud: true, tramoId,
+    corridorId: p.corridor_id || null,
   }));
   referenceNodes = nodes;
   displayNodes(nodes);
@@ -832,7 +875,7 @@ async function handleTramoSelect() {
   }
 
   const tramo = tramosCache.find((t) => t.id === tramoId);
-  const label = tramo ? `${tramo.corridors?.name || ''} / ${tramo.name}` : 'tramo';
+  const label = tramo ? tramo.name : 'circuito';
   const extra = stRes.ok && stRes.subtramos.length ? ` y ${stRes.subtramos.length} subtramo(s)` : '';
   showToast(`Cargados ${nodes.length} punto(s)${extra} de "${label}"`, 'success');
   el.savedTramoSelect.value = '';
@@ -864,28 +907,61 @@ function openNodeNamePopup(latlng, defaultName) {
   // (e.g. add → quitar → click again) and left the buttons unresponsive.
   const wrap = document.createElement('div');
   wrap.className = 'map-popup';
+
+  const noCorridors = corridorsCache.length === 0;
+  const corridorOpts = corridorsCache.map((c) =>
+    `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`
+  ).join('');
+  const lastUsed = referenceNodes.length
+    ? referenceNodes[referenceNodes.length - 1].corridorId
+    : '';
+
   wrap.innerHTML = `
     <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
     <input class="form-input np-name" type="text" autocomplete="off">
     <div class="map-popup-actions">
       <button type="button" class="btn btn-sm btn-primary   np-save">Añadir</button>
       <button type="button" class="btn btn-sm btn-secondary np-cancel">Cancelar</button>
+    </div>
+    <label class="form-label" style="margin-top:10px;display:block;">Corredor</label>
+    <select class="form-input np-corridor">
+      <option value="">— Seleccionar —</option>
+      ${corridorOpts}
+    </select>
+    <div class="np-warn text-xs" style="display:${noCorridors ? 'block' : 'none'};margin-top:6px;color:var(--ui-orange);">
+      No hay corredores. Crea uno en la sección Corredores antes de añadir nodos.
     </div>`;
-  const input  = wrap.querySelector('.np-name');
-  const save   = wrap.querySelector('.np-save');
-  const cancel = wrap.querySelector('.np-cancel');
+
+  const input    = wrap.querySelector('.np-name');
+  const save     = wrap.querySelector('.np-save');
+  const cancel   = wrap.querySelector('.np-cancel');
+  const corrSel  = wrap.querySelector('.np-corridor');
   input.value = defaultName;
+  if (lastUsed && corridorsCache.some((c) => c.id === lastUsed)) {
+    corrSel.value = lastUsed;
+  }
 
   const popup = L.popup({ closeButton: false, autoClose: true, closeOnClick: false })
     .setLatLng(latlng).setContent(wrap).openOn(map);
 
+  const updateSaveState = () => {
+    save.disabled = !corrSel.value;
+  };
+  updateSaveState();
+
   const commit = () => {
+    if (!corrSel.value) {
+      showToast('Selecciona un corredor para este nodo', 'warning');
+      corrSel.focus();
+      return;
+    }
     const name = (input.value || '').trim() || defaultName;
     map.closePopup(popup);
     referenceNodes.push({
       // Random suffix avoids Date.now() collisions on rapid double-clicks.
       id: 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
       name, lat: latlng.lat, lng: latlng.lng, cloud: false,
+      corridorId: corrSel.value,
     });
     displayNodes(referenceNodes);
     drawNodeMarkers(referenceNodes);
@@ -893,6 +969,7 @@ function openNodeNamePopup(latlng, defaultName) {
   };
   save.addEventListener('click',   commit);
   cancel.addEventListener('click', () => map.closePopup(popup));
+  corrSel.addEventListener('change', updateSaveState);
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter')  commit();
     if (ev.key === 'Escape') map.closePopup(popup);
@@ -915,10 +992,14 @@ function displayNodes(nodes) {
     const mark = n.cloud
       ? '<span class="node-flag node-flag--cloud">nube</span>'
       : '<span class="node-flag">local</span>';
+    const corridor = corridorsCache.find((c) => c.id === n.corridorId);
+    const corridorTag = corridor
+      ? `<span class="node-flag" style="background:var(--ui-orange-soft);color:var(--ui-orange);border-color:var(--ui-orange);">${escapeHtml(corridor.name)}</span>`
+      : '<span class="node-flag" style="background:#fee;color:#b91c1c;border-color:#fca5a5;">sin corredor</span>';
     return `
       <div class="node-item" data-id="${n.id}">
         <div style="flex:1;min-width:0;">
-          <span class="node-name">${i + 1}. ${escapeHtml(n.name)} ${mark}</span>
+          <span class="node-name">${i + 1}. ${escapeHtml(n.name)} ${mark} ${corridorTag}</span>
           <span class="node-coords">${Number(n.lat).toFixed(6)}, ${Number(n.lng).toFixed(6)}</span>
         </div>
         <button class="btn btn-sm btn-danger" data-remove title="Quitar">Quitar</button>
@@ -955,59 +1036,27 @@ function clearReferenceNodes() {
   updateProcessButton();
 }
 
-// ── Save Tramo modal ─────────────────────────────────────────
+// ── Save Circuito modal ──────────────────────────────────────
 function openSaveTramoModal() {
   if (referenceNodes.length === 0) {
     showToast('Agrega al menos un punto antes de guardar', 'warning');
     return;
   }
-  // Populate corridors dropdown
-  el.stCorridor.innerHTML = '';
-  const newOpt = document.createElement('option');
-  newOpt.value = '__new__';
-  newOpt.textContent = '✚ Nuevo corredor…';
-  el.stCorridor.appendChild(newOpt);
-
-  if (corridorsCache.length) {
-    const sep = document.createElement('option');
-    sep.disabled = true; sep.textContent = '──────────';
-    el.stCorridor.appendChild(sep);
-    for (const c of corridorsCache) {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = c.name;
-      el.stCorridor.appendChild(opt);
-    }
-    el.stCorridor.value = corridorsCache[0].id;
-    el.stCorridorNew.style.display = 'none';
-  } else {
-    el.stCorridor.value = '__new__';
-    el.stCorridorNew.style.display = 'block';
+  const sinCorredor = referenceNodes.filter((n) => !n.corridorId);
+  if (sinCorredor.length) {
+    showToast(`Hay ${sinCorredor.length} nodo(s) sin corredor. Asígnales uno antes de guardar.`, 'warning', 5000);
+    return;
   }
-
-  el.stCorridorNew.value = '';
   el.stTramoName.value = '';
   el.stCount.textContent = referenceNodes.length;
   el.saveTramoModal.classList.add('active');
-  setTimeout(() => {
-    if (el.stCorridor.value === '__new__') el.stCorridorNew.focus();
-    else el.stTramoName.focus();
-  }, 50);
+  setTimeout(() => el.stTramoName.focus(), 50);
 }
 
 async function handleSaveTramoSubmit() {
-  const isNewCorridor = el.stCorridor.value === '__new__';
-  const corridorId = isNewCorridor ? null : el.stCorridor.value;
-  const corridorName = isNewCorridor ? el.stCorridorNew.value.trim() : null;
   const tramoName = el.stTramoName.value.trim();
-
-  if (isNewCorridor && !corridorName) {
-    showToast('Ingresa el nombre del corredor', 'warning');
-    el.stCorridorNew.focus();
-    return;
-  }
   if (!tramoName) {
-    showToast('Ingresa el nombre del tramo', 'warning');
+    showToast('Ingresa el nombre del circuito', 'warning');
     el.stTramoName.focus();
     return;
   }
@@ -1016,12 +1065,13 @@ async function handleSaveTramoSubmit() {
   el.stSave.textContent = 'Guardando…';
 
   const res = await saveTramoComplete({
-    corridorId,
-    corridorName,
     tramoName,
     // Include local id so the backend can map subtramos' startNodeId/endNodeId
     // (which point to these local ids) to the freshly-inserted cloud uuids.
-    points: referenceNodes.map((n) => ({ id: n.id, name: n.name, lat: +n.lat, lng: +n.lng })),
+    points: referenceNodes.map((n) => ({
+      id: n.id, name: n.name, lat: +n.lat, lng: +n.lng,
+      corridorId: n.corridorId,
+    })),
     subtramos,
   });
 
@@ -1030,7 +1080,7 @@ async function handleSaveTramoSubmit() {
 
   if (res.success) {
     el.saveTramoModal.classList.remove('active');
-    showToast(`Tramo "${tramoName}" guardado (${referenceNodes.length} puntos)`, 'success');
+    showToast(`Circuito "${tramoName}" guardado (${referenceNodes.length} puntos)`, 'success');
     // Mark local nodes as cloud-backed now
     referenceNodes = referenceNodes.map((n) => ({ ...n, cloud: true, tramoId: res.tramoId }));
     displayNodes(referenceNodes);
