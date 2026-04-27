@@ -72,12 +72,6 @@ const el = {
   stCount:           $('stCount'),
   stSave:            $('stSave'),
   stCancel:          $('stCancel'),
-  // Corredores section (Nodos tab)
-  corredorNameInput: $('corredorNameInput'),
-  btnAddCorredor:    $('btnAddCorredor'),
-  corredoresInfo:    $('corredoresInfo'),
-  corredoresCount:   $('corredoresCount'),
-  corredoresList:    $('corredoresList'),
   thresholdInput: $('thresholdInput'),
   btnProcess: $('btnProcess'),
   processBadge: $('processBadge'),
@@ -231,12 +225,6 @@ function bindEvents() {
     if (e.target === el.saveTramoModal) el.saveTramoModal.classList.remove('active');
   });
 
-  // Corredores (catálogo global)
-  if (el.btnAddCorredor) el.btnAddCorredor.addEventListener('click', handleAddCorredor);
-  if (el.corredorNameInput) el.corredorNameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); handleAddCorredor(); }
-  });
-
   // Study corredor select (pestaña Tracks) — usa el mismo catálogo y
   // permite crear uno nuevo sin abandonar la pestaña.
   if (el.smCorredor) el.smCorredor.addEventListener('change', () => {
@@ -264,7 +252,6 @@ function bindEvents() {
       }
       const cRes = await listCorridors();
       corridorsCache = cRes.ok ? cRes.corridors : corridorsCache;
-      displayCorredores();
       populateStudyCorredorSelect(res.corridor.name);
       el.smCorredorNew.style.display = 'none';
       el.smCorredorNew.value = '';
@@ -761,7 +748,6 @@ function loadTrackData(points) {
 let drawingMode = false;
 let tramosCache = [];      // [{id, name, corridor_id, corridors:{id, name}}]
 let corridorsCache = [];   // [{id, name}]
-let activeCorridorId = null; // corredor preseleccionado en el popup de añadir nodo
 let currentTramoId = null;   // circuito actualmente cargado/guardado
 let currentTramoName = '';   // nombre del circuito actual (para upsert por nombre)
 
@@ -846,7 +832,6 @@ async function refreshTramos() {
   tramosCache = tRes.tramos;
   corridorsCache = cRes.ok ? cRes.corridors : [];
   renderTramoDropdown();
-  displayCorredores();
   populateStudyCorredorSelect();
 }
 
@@ -869,75 +854,6 @@ function populateStudyCorredorSelect(preferName) {
   } else {
     sel.value = '';
   }
-}
-
-function displayCorredores() {
-  if (!el.corredoresInfo || !el.corredoresList) return;
-  if (!corridorsCache.length) {
-    el.corredoresInfo.classList.add('hidden');
-    el.corredoresList.innerHTML = '';
-    activeCorridorId = null;
-    return;
-  }
-  // Si el activo dejó de existir (lo borraron en otra sesión), límpialo.
-  if (activeCorridorId && !corridorsCache.some((c) => c.id === activeCorridorId)) {
-    activeCorridorId = null;
-  }
-  el.corredoresInfo.classList.remove('hidden');
-  el.corredoresCount.textContent = corridorsCache.length;
-  el.corredoresList.innerHTML = corridorsCache.map((c) => {
-    const isActive = c.id === activeCorridorId;
-    const activeMark = isActive
-      ? '<span class="node-flag" style="background:var(--ui-orange);color:#fff;border-color:var(--ui-orange);">activo</span>'
-      : '';
-    const rowStyle = isActive
-      ? 'cursor:pointer;background:var(--ui-orange-soft);border:1px solid var(--ui-orange);'
-      : 'cursor:pointer;border:1px solid transparent;';
-    return `
-      <div class="node-item" data-corredor-id="${escapeHtml(c.id)}" style="${rowStyle}">
-        <div style="flex:1;min-width:0;">
-          <span class="node-name">${escapeHtml(c.name)} ${activeMark}</span>
-        </div>
-      </div>`;
-  }).join('');
-
-  el.corredoresList.querySelectorAll('[data-corredor-id]').forEach((row) => {
-    row.addEventListener('click', () => {
-      const id = row.dataset.corredorId;
-      activeCorridorId = (activeCorridorId === id) ? null : id;
-      displayCorredores();
-    });
-  });
-}
-
-async function handleAddCorredor() {
-  const name = (el.corredorNameInput.value || '').trim();
-  if (!name) {
-    showToast('Ingresa el nombre del corredor', 'warning');
-    el.corredorNameInput.focus();
-    return;
-  }
-  el.btnAddCorredor.disabled = true;
-  const res = await createCorridor(name);
-  el.btnAddCorredor.disabled = false;
-  if (!res.ok) {
-    if (res.missing) { el.cpSetupModal.classList.add('active'); return; }
-    showToast(`Error: ${res.error}`, 'error');
-    return;
-  }
-  if (res.duplicate) {
-    showToast(`"${name}" ya existe`, 'warning');
-  } else {
-    showToast(`Corredor "${name}" creado`, 'success');
-  }
-  el.corredorNameInput.value = '';
-  // Refresh cache + UI (lists, dropdowns inside the create-node popup, etc.)
-  const cRes = await listCorridors();
-  corridorsCache = cRes.ok ? cRes.corridors : corridorsCache;
-  // Dejar activo el corredor recién creado/seleccionado para encadenar nodos.
-  if (res.corridor && res.corridor.id) activeCorridorId = res.corridor.id;
-  displayCorredores();
-  populateStudyCorredorSelect();
 }
 
 function renderTramoDropdown() {
@@ -1027,14 +943,11 @@ function openNodeNamePopup(latlng, defaultName) {
   const corridorOpts = corridorsCache.map((c) =>
     `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`
   ).join('');
-  // Preferir el corredor activo (seleccionado en la sección Corredores);
-  // si no hay, tomar el del último nodo creado para encadenar mismo corredor.
-  const lastUsed = referenceNodes.length
+  // Preselect: corredor del último nodo creado, para encadenar nodos del
+  // mismo corredor sin tener que tocar el dropdown en cada uno.
+  const preselect = referenceNodes.length
     ? referenceNodes[referenceNodes.length - 1].corridorId
     : '';
-  const preselect = (activeCorridorId && corridorsCache.some((c) => c.id === activeCorridorId))
-    ? activeCorridorId
-    : lastUsed;
 
   wrap.innerHTML = `
     <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
@@ -1049,7 +962,7 @@ function openNodeNamePopup(latlng, defaultName) {
       ${corridorOpts}
     </select>
     <div class="np-warn text-xs" style="display:${noCorridors ? 'block' : 'none'};margin-top:6px;color:var(--ui-orange);">
-      No hay corredores. Crea uno en la sección Corredores antes de añadir nodos.
+      No hay corredores. Crea uno desde la pestaña Tracks → Corredor → "Nuevo corredor…".
     </div>`;
 
   const input    = wrap.querySelector('.np-name');
