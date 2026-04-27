@@ -1204,12 +1204,15 @@
     <!-- Save circuito modal -->
     <div class="modal-overlay" id="saveTramoModal">
       <div class="modal" style="max-width:460px;">
-        <div class="modal-title">Guardar circuito</div>
+        <div class="modal-title" id="stModalTitle">Guardar circuito</div>
         <div class="modal-body">
           <div class="form-group">
             <label class="form-label">Nombre del circuito</label>
             <input type="text" id="stTramoName" class="form-input"
                    placeholder="Ej: Circuito Norte" autocomplete="off">
+          </div>
+          <div class="text-xs" id="stOverwriteHint" style="display:none;color:var(--ui-orange);margin-bottom:8px;">
+            Se sobrescribirá el circuito existente con el mismo nombre.
           </div>
           <div class="text-xs text-muted">
             Se guardarán <strong id="stCount">0</strong> puntos en la nube.

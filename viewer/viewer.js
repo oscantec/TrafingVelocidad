@@ -66,6 +66,8 @@ const el = {
   cpSetupClose:      $('cpSetupClose'),
   cpSetupRetry:      $('cpSetupRetry'),
   saveTramoModal:    $('saveTramoModal'),
+  stModalTitle:      $('stModalTitle'),
+  stOverwriteHint:   $('stOverwriteHint'),
   stTramoName:       $('stTramoName'),
   stCount:           $('stCount'),
   stSave:            $('stSave'),
@@ -760,6 +762,8 @@ let drawingMode = false;
 let tramosCache = [];      // [{id, name, corridor_id, corridors:{id, name}}]
 let corridorsCache = [];   // [{id, name}]
 let activeCorridorId = null; // corredor preseleccionado en el popup de añadir nodo
+let currentTramoId = null;   // circuito actualmente cargado/guardado
+let currentTramoName = '';   // nombre del circuito actual (para upsert por nombre)
 
 const TRAMIFICATION_SETUP_SQL = `-- ═══════════════════════════════════════════════════════════
 --  Migración v2 (corredor por nodo)
@@ -986,6 +990,9 @@ async function handleTramoSelect() {
   const label = tramo ? tramo.name : 'circuito';
   const extra = stRes.ok && stRes.subtramos.length ? ` y ${stRes.subtramos.length} subtramo(s)` : '';
   showToast(`Cargados ${nodes.length} punto(s)${extra} de "${label}"`, 'success');
+  // Recordar el circuito cargado para que el siguiente "Guardar" sobrescriba.
+  currentTramoId = tramoId;
+  currentTramoName = tramo ? tramo.name : '';
   el.savedTramoSelect.value = '';
 }
 
@@ -1144,6 +1151,10 @@ function clearReferenceNodes() {
   if (referenceNodes.length === 0) return;
   if (!confirm(`¿Vaciar los ${referenceNodes.length} puntos actuales? Esto no borra lo guardado en nube.`)) return;
   referenceNodes = [];
+  // Salir del contexto del circuito en uso para que el siguiente guardado
+  // no sobrescriba el circuito previo con los puntos nuevos.
+  currentTramoId = null;
+  currentTramoName = '';
   displayNodes(referenceNodes);
   drawNodeMarkers(referenceNodes);
   updateProcessButton();
@@ -1160,10 +1171,16 @@ function openSaveTramoModal() {
     showToast(`Hay ${sinCorredor.length} nodo(s) sin corredor. Asígnales uno antes de guardar.`, 'warning', 5000);
     return;
   }
-  el.stTramoName.value = '';
+  // Prefill con el nombre del circuito en uso (si hay) — al darle Guardar
+  // se sobrescribe el mismo registro en la nube.
+  el.stTramoName.value = currentTramoName || '';
   el.stCount.textContent = referenceNodes.length;
+  const overwriting = !!currentTramoName;
+  if (el.stModalTitle) el.stModalTitle.textContent = overwriting ? 'Actualizar circuito' : 'Guardar circuito';
+  if (el.stOverwriteHint) el.stOverwriteHint.style.display = overwriting ? 'block' : 'none';
+  if (el.stSave) el.stSave.textContent = overwriting ? 'Actualizar' : 'Guardar';
   el.saveTramoModal.classList.add('active');
-  setTimeout(() => el.stTramoName.focus(), 50);
+  setTimeout(() => { el.stTramoName.focus(); el.stTramoName.select(); }, 50);
 }
 
 async function handleSaveTramoSubmit() {
@@ -1174,10 +1191,18 @@ async function handleSaveTramoSubmit() {
     return;
   }
 
+  // Pasar tramoId solo si el nombre no cambió respecto al circuito en uso.
+  // Si el usuario cambia el nombre, el upsert decide por nombre exacto: si
+  // existe lo sobrescribe; si no, crea uno nuevo (efectivo "guardar como").
+  const sameName = currentTramoId &&
+    currentTramoName.trim().toLowerCase() === tramoName.toLowerCase();
+  const restoreLabel = sameName ? 'Actualizar' : 'Guardar';
+
   el.stSave.disabled = true;
-  el.stSave.textContent = 'Guardando…';
+  el.stSave.textContent = sameName ? 'Actualizando…' : 'Guardando…';
 
   const res = await saveTramoComplete({
+    tramoId: sameName ? currentTramoId : null,
     tramoName,
     // Include local id so the backend can map subtramos' startNodeId/endNodeId
     // (which point to these local ids) to the freshly-inserted cloud uuids.
@@ -1189,14 +1214,17 @@ async function handleSaveTramoSubmit() {
   });
 
   el.stSave.disabled = false;
-  el.stSave.textContent = 'Guardar';
+  el.stSave.textContent = restoreLabel;
 
   if (res.success) {
     el.saveTramoModal.classList.remove('active');
-    showToast(`Circuito "${tramoName}" guardado (${referenceNodes.length} puntos)`, 'success');
+    const verb = res.updated ? 'actualizado' : 'guardado';
+    showToast(`Circuito "${tramoName}" ${verb} (${referenceNodes.length} puntos)`, 'success');
     // Mark local nodes as cloud-backed now
     referenceNodes = referenceNodes.map((n) => ({ ...n, cloud: true, tramoId: res.tramoId }));
     displayNodes(referenceNodes);
+    currentTramoId = res.tramoId;
+    currentTramoName = tramoName;
     await refreshTramos();
   } else if (res.missing) {
     el.saveTramoModal.classList.remove('active');
