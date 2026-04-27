@@ -102,6 +102,7 @@ const el = {
   tabSegments: $('tabSegments'),
   // Study metadata (Corredor is global; Tipo/Calzada/Periodo are per-recorrido)
   smCorredor: $('smCorredor'),
+  smCorredorNew: $('smCorredorNew'),
   btnExportExcel: $('btnExportExcel'),
   // Recorridos list
   recorridosBox:   $('recorridosBox'),
@@ -233,6 +234,49 @@ function bindEvents() {
   if (el.corredorNameInput) el.corredorNameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); handleAddCorredor(); }
   });
+
+  // Study corredor select (pestaña Tracks) — usa el mismo catálogo y
+  // permite crear uno nuevo sin abandonar la pestaña.
+  if (el.smCorredor) el.smCorredor.addEventListener('change', () => {
+    const isNew = el.smCorredor.value === '__new__';
+    if (el.smCorredorNew) {
+      el.smCorredorNew.style.display = isNew ? 'block' : 'none';
+      if (isNew) { el.smCorredorNew.value = ''; el.smCorredorNew.focus(); }
+    }
+  });
+  if (el.smCorredorNew) {
+    const commitNewStudyCorredor = async () => {
+      const name = (el.smCorredorNew.value || '').trim();
+      if (!name) {
+        el.smCorredor.value = '';
+        el.smCorredorNew.style.display = 'none';
+        return;
+      }
+      el.smCorredorNew.disabled = true;
+      const res = await createCorridor(name);
+      el.smCorredorNew.disabled = false;
+      if (!res.ok) {
+        if (res.missing) { el.cpSetupModal.classList.add('active'); return; }
+        showToast(`Error: ${res.error}`, 'error');
+        return;
+      }
+      const cRes = await listCorridors();
+      corridorsCache = cRes.ok ? cRes.corridors : corridorsCache;
+      displayCorredores();
+      populateStudyCorredorSelect(res.corridor.name);
+      el.smCorredorNew.style.display = 'none';
+      el.smCorredorNew.value = '';
+    };
+    el.smCorredorNew.addEventListener('blur',  commitNewStudyCorredor);
+    el.smCorredorNew.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commitNewStudyCorredor(); }
+      if (e.key === 'Escape') {
+        el.smCorredorNew.value = '';
+        el.smCorredor.value = '';
+        el.smCorredorNew.style.display = 'none';
+      }
+    });
+  }
 
   // Process (segmentación visual del recorrido activo)
   el.btnProcess.addEventListener('click', processSegmentation);
@@ -783,6 +827,28 @@ async function refreshTramos() {
   corridorsCache = cRes.ok ? cRes.corridors : [];
   renderTramoDropdown();
   displayCorredores();
+  populateStudyCorredorSelect();
+}
+
+function populateStudyCorredorSelect(preferName) {
+  const sel = el.smCorredor;
+  if (!sel) return;
+  const previous = preferName != null ? preferName : sel.value;
+  sel.innerHTML = '';
+  sel.appendChild(new Option('— Seleccionar —', ''));
+  for (const c of corridorsCache) {
+    sel.appendChild(new Option(c.name, c.name));
+  }
+  sel.appendChild(new Option('✚ Nuevo corredor…', '__new__'));
+  // Preserve selection if it still exists; otherwise blank.
+  if (previous && previous !== '__new__' &&
+      [...sel.options].some((o) => o.value === previous)) {
+    sel.value = previous;
+  } else if (previous === '__new__') {
+    sel.value = '__new__';
+  } else {
+    sel.value = '';
+  }
 }
 
 function displayCorredores() {
@@ -851,6 +917,7 @@ async function handleAddCorredor() {
   // Dejar activo el corredor recién creado/seleccionado para encadenar nodos.
   if (res.corridor && res.corridor.id) activeCorridorId = res.corridor.id;
   displayCorredores();
+  populateStudyCorredorSelect();
 }
 
 function renderTramoDropdown() {
@@ -1770,9 +1837,12 @@ function upperOrBlank(v) {
 }
 
 function currentStudy() {
-  return {
-    corredor: (el.smCorredor?.value || '').trim(),
-  };
+  // smCorredor es ahora un <select>. Si quedó '__new__' sin commit, usa lo
+  // que haya escrito el usuario en el input acompañante; si no, tratar como
+  // vacío para no propagar el sentinel a Excel/filename.
+  let value = (el.smCorredor?.value || '').trim();
+  if (value === '__new__') value = (el.smCorredorNew?.value || '').trim();
+  return { corredor: value };
 }
 
 function computeExportRows() {

@@ -893,7 +893,13 @@
           <div class="viewer-panel-section">
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" for="smCorredor">Corredor</label>
-              <input type="text" id="smCorredor" class="form-input" placeholder="Nombre del corredor">
+              <select id="smCorredor" class="form-input">
+                <option value="">— Seleccionar —</option>
+                <option value="__new__">✚ Nuevo corredor…</option>
+              </select>
+              <input type="text" id="smCorredorNew" class="form-input"
+                     placeholder="Nombre del nuevo corredor"
+                     style="margin-top:6px;display:none;" autocomplete="off">
             </div>
           </div>
 
