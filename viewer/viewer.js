@@ -1717,19 +1717,6 @@ function subtramoRowsForRecorrido(rec, threshold) {
     crossingsByNode.set(n.id, findNodeCrossings(n, rec.points, threshold));
   }
 
-  // Accept crossings at OR after the cursor, so two consecutive subtramos
-  // that share the middle node (A→B followed by B→C) can both use the
-  // same B crossing — the first as its endNode, the second as its
-  // startNode. With strict `>` the second subtramo would look for a
-  // fresh B crossing that doesn't exist in that sentido.
-  const firstIdxAtOrAfter = (nodeId, afterIdx) => {
-    if (nodeId === START_NODE_ID) return 0;
-    if (nodeId === END_NODE_ID)   return rec.points.length - 1;
-    const list = crossingsByNode.get(nodeId) || [];
-    const hit = list.find((c) => c.trackIndex >= afterIdx);
-    return hit ? hit.trackIndex : -1;
-  };
-
   // For the subtramo's START we want the LAST near-pass to the start
   // node before the vehicle commits to the end node. A recorrido that
   // grazes the threshold disc, drifts out, and then passes much closer
@@ -1748,15 +1735,32 @@ function subtramoRowsForRecorrido(rec, threshold) {
     return pick;
   };
 
-  // Helper: encuentra (startIdx, endIdx) para un subtramo a partir de
-  // `fromIdx`. Devuelve {-1,-1} si no hay par válido.
+  // Lista (en orden de track) de índices candidatos para un nodo final
+  // a partir de `fromIdx`. Para sentinels devuelve un único índice fijo.
+  const endCandidatesFrom = (nodeId, fromIdx) => {
+    if (nodeId === START_NODE_ID) return fromIdx <= 0 ? [0] : [];
+    if (nodeId === END_NODE_ID)   return [rec.points.length - 1];
+    const list = crossingsByNode.get(nodeId) || [];
+    const out = [];
+    for (const c of list) if (c.trackIndex >= fromIdx) out.push(c.trackIndex);
+    return out;
+  };
+
+  // Encuentra (startIdx, endIdx) para un subtramo iterando todos los pasos
+  // del nodo final desde `fromIdx`: el primero que tenga un start válido
+  // antes (en [fromIdx, endIdx)) gana. Esto es clave cuando un nodo aparece
+  // varias veces (típico en circuitos que pasan ida y vuelta) y la primera
+  // aparición del end no tiene start antes — antes saltábamos al siguiente
+  // subtramo y la fila quedaba en blanco.
   const matchFrom = (st, fromIdx) => {
-    const tentativeEndIdx = firstIdxAtOrAfter(st.endNodeId, fromIdx);
-    const startIdx = tentativeEndIdx >= 0
-      ? lastIdxBetween(st.startNodeId, fromIdx, tentativeEndIdx + 1)
-      : -1;
-    const endIdx = startIdx >= 0 ? firstIdxAtOrAfter(st.endNodeId, startIdx + 1) : -1;
-    return { startIdx, endIdx };
+    for (const endIdx of endCandidatesFrom(st.endNodeId, fromIdx)) {
+      const startIdx = lastIdxBetween(st.startNodeId, fromIdx, endIdx);
+      if (startIdx < 0) continue;
+      if (startIdx < fromIdx) continue;       // sentinel anclado antes del cursor
+      if (startIdx >= endIdx) continue;       // start debe ir antes que end
+      return { startIdx, endIdx };
+    }
+    return { startIdx: -1, endIdx: -1 };
   };
 
   // Every active subtramo produces exactly one row per recorrido. Estrategia:
