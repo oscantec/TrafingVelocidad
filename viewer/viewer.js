@@ -1748,27 +1748,39 @@ function subtramoRowsForRecorrido(rec, threshold) {
     return pick;
   };
 
-  // Every active subtramo produces exactly one row per recorrido. If the
-  // sequential walk can match both nodes we fill in the real metrics; if
-  // a node has no crossing in this track (e.g. nodo alias marcado con *
-  // que aún no está sobre el track, o el carro no pasó por ahí) the row
-  // is emitted anyway with empty times and zeroed metrics so the operator
-  // sees that the subtramo existed in the definition but no se recorrió.
+  // Helper: encuentra (startIdx, endIdx) para un subtramo a partir de
+  // `fromIdx`. Devuelve {-1,-1} si no hay par válido.
+  const matchFrom = (st, fromIdx) => {
+    const tentativeEndIdx = firstIdxAtOrAfter(st.endNodeId, fromIdx);
+    const startIdx = tentativeEndIdx >= 0
+      ? lastIdxBetween(st.startNodeId, fromIdx, tentativeEndIdx + 1)
+      : -1;
+    const endIdx = startIdx >= 0 ? firstIdxAtOrAfter(st.endNodeId, startIdx + 1) : -1;
+    return { startIdx, endIdx };
+  };
+
+  // Every active subtramo produces exactly one row per recorrido. Estrategia:
+  //   1) Intentamos matchear avanzando un cursor para que dos subtramos
+  //      consecutivos A→B / B→C compartan el cruce de B.
+  //   2) Si el cursor ya pasó al subtramo (por ejemplo, un circuito con
+  //      varios corredores cuyos subtramos están listados fuera del orden
+  //      en que el track los visita), buscamos el par desde 0 sin mover
+  //      el cursor — así no perdemos los subtramos "anteriores".
+  //   3) Si tampoco hay par, emitimos la fila con blancos para que el
+  //      operador vea que el subtramo existe pero no se recorrió.
   const out = [];
   let cursor = 0;
   for (const st of subtramos) {
     if (!st.active) continue;
 
-    const tentativeEndIdx = firstIdxAtOrAfter(st.endNodeId, cursor);
-    const startIdx = tentativeEndIdx >= 0
-      ? lastIdxBetween(st.startNodeId, cursor, tentativeEndIdx + 1)
-      : -1;
-    // endIdx must land strictly after startIdx so the two cruces are
-    // distinct points (the subtramo tiene duración > 0).
-    const endIdx = startIdx >= 0 ? firstIdxAtOrAfter(st.endNodeId, startIdx + 1) : -1;
-    const hasMatch = startIdx >= 0 && endIdx > startIdx;
+    let { startIdx, endIdx } = matchFrom(st, cursor);
+    let advanceCursor = true;
+    if (!(startIdx >= 0 && endIdx > startIdx)) {
+      ({ startIdx, endIdx } = matchFrom(st, 0));
+      advanceCursor = false;
+    }
 
-    if (hasMatch) {
+    if (startIdx >= 0 && endIdx > startIdx) {
       const segPoints = rec.points.slice(startIdx, endIdx + 1);
       if (segPoints.length >= 2) {
         const metrics = segmentMetrics(segPoints);
@@ -1782,13 +1794,11 @@ function subtramoRowsForRecorrido(rec, threshold) {
           time:     metrics.time,
           avgSpeed: metrics.avgSpeed,
         });
-        cursor = endIdx;
+        if (advanceCursor) cursor = endIdx;
         continue;
       }
     }
 
-    // No usable crossings — still emit the row with blanks so the user
-    // sees every subtramo that's marked active.
     out.push({
       subtramo: st,
       matched:  false,
