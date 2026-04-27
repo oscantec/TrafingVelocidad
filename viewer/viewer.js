@@ -1803,8 +1803,11 @@ function subtramoRowsForRecorrido(rec, threshold) {
   // varias veces (típico en circuitos que pasan ida y vuelta) y la primera
   // aparición del end no tiene start antes — antes saltábamos al siguiente
   // subtramo y la fila quedaba en blanco.
-  const matchFrom = (st, fromIdx) => {
-    for (const endIdx of endCandidatesFrom(st.endNodeId, fromIdx)) {
+  const matchFrom = (st, fromIdx, debug) => {
+    const endCands = endCandidatesFrom(st.endNodeId, fromIdx);
+    if (debug) debug.endCands = endCands;
+    if (debug) debug.startCrossings = (crossingsByNode.get(st.startNodeId) || []).map((c) => c.trackIndex);
+    for (const endIdx of endCands) {
       const startIdx = lastIdxBetween(st.startNodeId, fromIdx, endIdx);
       if (startIdx < 0) continue;
       if (startIdx < fromIdx) continue;       // sentinel anclado antes del cursor
@@ -1828,11 +1831,14 @@ function subtramoRowsForRecorrido(rec, threshold) {
   for (const st of subtramos) {
     if (!st.active) continue;
 
-    let { startIdx, endIdx } = matchFrom(st, cursor);
+    const dbg = {};
+    let { startIdx, endIdx } = matchFrom(st, cursor, dbg);
     let advanceCursor = true;
+    let usedFallback = false;
     if (!(startIdx >= 0 && endIdx > startIdx)) {
-      ({ startIdx, endIdx } = matchFrom(st, 0));
+      ({ startIdx, endIdx } = matchFrom(st, 0, dbg));
       advanceCursor = false;
+      usedFallback = true;
     }
 
     if (startIdx >= 0 && endIdx > startIdx) {
@@ -1853,6 +1859,18 @@ function subtramoRowsForRecorrido(rec, threshold) {
         continue;
       }
     }
+
+    // DEBUG temporal: imprime por qué este subtramo no machó.
+    console.warn('[match] sin match', {
+      recorrido: rec.name,
+      sub: `${resolveNodeName(st.startNodeId)} → ${resolveNodeName(st.endNodeId)}`,
+      sentido: st.sentido || '',
+      cursor,
+      usedFallback,
+      endCandidates: dbg.endCands,
+      startCrossings: dbg.startCrossings,
+      trackLength: rec.points.length,
+    });
 
     out.push({
       subtramo: st,
