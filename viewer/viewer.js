@@ -1640,6 +1640,28 @@ function autoDetectIfEmpty() {
   autoDetectSubtramos({ silent: true });
 }
 
+function corridorNameForNode(nodeId) {
+  if (!nodeId || nodeId === START_NODE_ID || nodeId === END_NODE_ID) return '';
+  const n = referenceNodes.find((x) => x.id === nodeId);
+  if (!n) return '';
+  const c = corridorsCache.find((cc) => cc.id === n.corridorId);
+  return c ? c.name : '';
+}
+
+// Derived corridor for a subtramo: ambos extremos deben coincidir. Cuando un
+// extremo es Inicio/Fin se hereda del otro.
+function subtramoCorridorName(st) {
+  const sStart = st.startNodeId === START_NODE_ID || st.startNodeId === END_NODE_ID;
+  const sEnd   = st.endNodeId   === START_NODE_ID || st.endNodeId   === END_NODE_ID;
+  if (sStart && sEnd) return '';
+  if (sStart) return corridorNameForNode(st.endNodeId);
+  if (sEnd)   return corridorNameForNode(st.startNodeId);
+  const a = corridorNameForNode(st.startNodeId);
+  const b = corridorNameForNode(st.endNodeId);
+  if (!a || !b) return '';
+  return a === b ? a : '';
+}
+
 function nodeOptionsHtml(selectedId) {
   const opts = [
     `<option value="${START_NODE_ID}"${selectedId === START_NODE_ID ? ' selected' : ''}>Inicio</option>`,
@@ -1647,7 +1669,9 @@ function nodeOptionsHtml(selectedId) {
   ];
   for (const n of referenceNodes) {
     const sel = n.id === selectedId ? ' selected' : '';
-    opts.push(`<option value="${n.id}"${sel}>${escapeHtml(n.name)}</option>`);
+    const cname = corridorNameForNode(n.id);
+    const label = cname ? `${n.name} — ${cname}` : `${n.name} (sin corredor)`;
+    opts.push(`<option value="${n.id}"${sel}>${escapeHtml(label)}</option>`);
   }
   return opts.join('');
 }
@@ -1664,6 +1688,10 @@ function renderSubtramosTable() {
 
   el.subtramosBody.innerHTML = subtramos.map((st, i) => {
     const rowStyle = st.active ? '' : 'opacity:0.45;';
+    const cname = subtramoCorridorName(st);
+    const corredorCell = cname
+      ? `<span class="node-flag" style="background:var(--ui-orange-soft);color:var(--ui-orange);border-color:var(--ui-orange);">${escapeHtml(cname)}</span>`
+      : `<span class="node-flag" style="background:#fee;color:#b91c1c;border-color:#fca5a5;" title="Los extremos no comparten corredor">—</span>`;
     return `
     <tr data-id="${st.id}" style="${rowStyle}">
       <td style="text-align:center;"><input type="checkbox" data-active ${st.active ? 'checked' : ''}></td>
@@ -1671,6 +1699,7 @@ function renderSubtramosTable() {
       <td><select data-start>${nodeOptionsHtml(st.startNodeId)}</select></td>
       <td><select data-end>${nodeOptionsHtml(st.endNodeId)}</select></td>
       <td><input type="text" data-sentido value="${escapeHtml(st.sentido || '')}" placeholder="S - N"></td>
+      <td data-corredor>${corredorCell}</td>
       <td><button class="btn btn-sm btn-secondary" data-remove title="Quitar">Quitar</button></td>
     </tr>`;
   }).join('');
@@ -1683,8 +1712,16 @@ function renderSubtramosTable() {
       st.active = ev.target.checked;
       row.style.opacity = st.active ? '' : '0.45';
     });
-    row.querySelector('[data-start]').addEventListener('change', (ev) => { st.startNodeId = ev.target.value; });
-    row.querySelector('[data-end]').addEventListener('change',   (ev) => { st.endNodeId   = ev.target.value; });
+    const refreshCorredorCell = () => {
+      const cell = row.querySelector('[data-corredor]');
+      if (!cell) return;
+      const cname = subtramoCorridorName(st);
+      cell.innerHTML = cname
+        ? `<span class="node-flag" style="background:var(--ui-orange-soft);color:var(--ui-orange);border-color:var(--ui-orange);">${escapeHtml(cname)}</span>`
+        : `<span class="node-flag" style="background:#fee;color:#b91c1c;border-color:#fca5a5;" title="Los extremos no comparten corredor">—</span>`;
+    };
+    row.querySelector('[data-start]').addEventListener('change', (ev) => { st.startNodeId = ev.target.value; refreshCorredorCell(); });
+    row.querySelector('[data-end]').addEventListener('change',   (ev) => { st.endNodeId   = ev.target.value; refreshCorredorCell(); });
     row.querySelector('[data-sentido]').addEventListener('input', (ev) => { st.sentido    = ev.target.value; });
     row.querySelector('[data-remove]').addEventListener('click', () => {
       subtramos = subtramos.filter((s) => s.id !== st.id);
