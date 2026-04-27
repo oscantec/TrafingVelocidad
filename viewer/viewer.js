@@ -858,43 +858,48 @@ function handleMapClickForDrawing(e) {
 }
 
 function openNodeNamePopup(latlng, defaultName) {
-  const html = `
-    <div class="map-popup">
-      <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
-      <input id="np-name" class="form-input" type="text" value="${defaultName}" autocomplete="off">
-      <div class="map-popup-actions">
-        <button id="np-save"   class="btn btn-sm btn-primary">Añadir</button>
-        <button id="np-cancel" class="btn btn-sm btn-secondary">Cancelar</button>
-      </div>
+  // Build the popup content as a real DOM node so we can wire handlers
+  // against direct element references — not via document.getElementById,
+  // which raced with autoClose when the user reopened the popup quickly
+  // (e.g. add → quitar → click again) and left the buttons unresponsive.
+  const wrap = document.createElement('div');
+  wrap.className = 'map-popup';
+  wrap.innerHTML = `
+    <div class="map-popup-coords">${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}</div>
+    <input class="form-input np-name" type="text" autocomplete="off">
+    <div class="map-popup-actions">
+      <button type="button" class="btn btn-sm btn-primary   np-save">Añadir</button>
+      <button type="button" class="btn btn-sm btn-secondary np-cancel">Cancelar</button>
     </div>`;
+  const input  = wrap.querySelector('.np-name');
+  const save   = wrap.querySelector('.np-save');
+  const cancel = wrap.querySelector('.np-cancel');
+  input.value = defaultName;
 
   const popup = L.popup({ closeButton: false, autoClose: true, closeOnClick: false })
-    .setLatLng(latlng).setContent(html).openOn(map);
+    .setLatLng(latlng).setContent(wrap).openOn(map);
 
-  setTimeout(() => {
-    const input = document.getElementById('np-name');
-    const save  = document.getElementById('np-save');
-    const cancel = document.getElementById('np-cancel');
-    if (input) { input.focus(); input.select(); }
-
-    const commit = () => {
-      const name = (input.value || '').trim() || defaultName;
-      map.closePopup(popup);
-      referenceNodes.push({
-        id: 'local-' + Date.now(),
-        name, lat: latlng.lat, lng: latlng.lng, cloud: false,
-      });
-      displayNodes(referenceNodes);
-      drawNodeMarkers(referenceNodes);
-      updateProcessButton();
-    };
-    if (save)   save.onclick = commit;
-    if (cancel) cancel.onclick = () => map.closePopup(popup);
-    if (input)  input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter')  commit();
-      if (ev.key === 'Escape') map.closePopup(popup);
+  const commit = () => {
+    const name = (input.value || '').trim() || defaultName;
+    map.closePopup(popup);
+    referenceNodes.push({
+      // Random suffix avoids Date.now() collisions on rapid double-clicks.
+      id: 'local-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+      name, lat: latlng.lat, lng: latlng.lng, cloud: false,
     });
-  }, 30);
+    displayNodes(referenceNodes);
+    drawNodeMarkers(referenceNodes);
+    updateProcessButton();
+  };
+  save.addEventListener('click',   commit);
+  cancel.addEventListener('click', () => map.closePopup(popup));
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter')  commit();
+    if (ev.key === 'Escape') map.closePopup(popup);
+  });
+
+  // Focus once Leaflet has finished mounting the popup in the DOM.
+  requestAnimationFrame(() => { input.focus(); input.select(); });
 }
 
 function displayNodes(nodes) {
