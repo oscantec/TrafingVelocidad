@@ -15,8 +15,8 @@ import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, re
 import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, createCorridor, listControlPointsByTramo,
          listSubtramosByTramo,
-         saveTramoComplete, deleteTramo,
-         buildTrackShareUrl, decodeTrackName } from '../lib/supabase.js';
+         saveTramoComplete, deleteTramo, syncTrackToCloud,
+         buildTrackShareUrl, encodeTrackName, decodeTrackName } from '../lib/supabase.js';
 import { synthesizeRecorrido, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
@@ -2184,26 +2184,54 @@ function buildSetConCuarto() {
     if (!synth) { incompletos.push({ key, count: arr.length }); continue; }
 
     const base = arr[arr.length - 1];
-    out.push({
-      id: `synth-${base.id}`,
-      name: `Recorrido 4 (generado)`,
+    const rec = {
+      id: synth.meta.localId,
+      // El nombre viaja al slug del enlace y a la lista "Cargar desde la
+      // nube", así que lleva el marcador R4 GEN: quien vea el track en
+      // Supabase debe poder distinguirlo de uno medido en campo.
+      name: `${base.name} R4 GEN`,
       points: synth.points,
       startTs: synth.startTs,
-      sourceUrl: '',            // sin track en la nube: la celda LINK va vacía
+      endTs: synth.endTs,
+      sourceUrl: '',            // se llena al publicarlo en Supabase
       cloudId: '',
       tipo: base.tipo,
       calzada: base.calzada,
       periodo: base.periodo,
       consecutivo: 4,
       synthetic: true,
-    });
-    generados.push({ key, meta: synth.meta });
+    };
+    out.push(rec);
+    generados.push({ key, rec, meta: synth.meta });
   }
 
   return { list: out, generados, incompletos };
 }
 
-function exportExcelConCuarto() {
+// Publica el recorrido generado en Supabase (tablas `tracks` + `gps_points`,
+// las mismas que usa Captura) para que tenga un enlace real de visor. El
+// upsert va contra un local_id determinista, así que reexportar actualiza
+// el mismo registro en lugar de sembrar duplicados.
+async function publicarRecorridoGenerado(rec) {
+  const res = await syncTrackToCloud({
+    id:        rec.id,
+    name:      encodeTrackName(rec.name, rec.tipo, rec.calzada, rec.periodo),
+    startTime: rec.startTs,
+    endTime:   rec.endTs,
+  }, rec.points);
+
+  if (!res.success) throw new Error(res.error || 'Error desconocido al publicar');
+
+  rec.cloudId = res.cloudId;
+  rec.sourceUrl = buildTrackShareUrl({
+    id: res.cloudId,
+    name: rec.name,
+    start_time: new Date(rec.startTs).toISOString(),
+  });
+  return rec.sourceUrl;
+}
+
+async function exportExcelConCuarto() {
   if (typeof XLSX === 'undefined') {
     showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
     return;
@@ -2222,6 +2250,30 @@ function exportExcelConCuarto() {
     return;
   }
 
+  // Subir primero: el Excel no debe salir con la celda LINK en blanco.
+  const btn = el.btnExportExcel4;
+  const labelPrev = btn?.textContent;
+  let fallidos = 0;
+  if (generados.length) {
+    try {
+      if (btn) { btn.disabled = true; btn.textContent = 'Publicando…'; }
+      for (const g of generados) {
+        try {
+          await publicarRecorridoGenerado(g.rec);
+        } catch (err) {
+          console.error('[Viewer] publish synth error:', err);
+          fallidos++;
+        }
+      }
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = labelPrev; }
+    }
+  }
+  if (fallidos === generados.length) {
+    showToast('No se pudo publicar el recorrido generado en Supabase; el enlace quedaría vacío. Revisa la conexión.', 'error', 8000);
+    return;
+  }
+
   const rows = computeExportRows(list);
   if (!rows.length) {
     showToast('Ningún subtramo activo pudo matchearse con los recorridos. Revisa nodos y umbral.', 'warning');
@@ -2236,9 +2288,13 @@ function exportExcelConCuarto() {
     filename: `VEL_TRAFING_${corredorSlug(study.corredor)}_${stamp}_4R.xlsx`,
   });
 
-  let msg = `${rows.length} filas · cuarto recorrido generado en ${generados.length} grupo(s)`;
+  let msg = `${rows.length} filas · cuarto recorrido generado y publicado en ${generados.length - fallidos} grupo(s)`;
+  if (fallidos)           msg += ` · ${fallidos} sin publicar (LINK vacío)`;
   if (incompletos.length) msg += ` · ${incompletos.length} grupo(s) sin los 3 recorridos requeridos`;
-  showToast(msg, 'success', 7000);
+  showToast(msg, fallidos ? 'warning' : 'success', 8000);
+
+  // Refresca el desplegable de la nube para que el generado aparezca ahí.
+  if (generados.length > fallidos) refreshCloudTracks().catch(() => {});
 }
 
 // ── Boot ─────────────────────────────────────────────────────
