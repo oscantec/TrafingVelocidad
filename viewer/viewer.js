@@ -17,6 +17,7 @@ import { listCloudTracks, getCloudTrackPoints, testConnection,
          listSubtramosByTramo,
          saveTramoComplete, deleteTramo,
          buildTrackShareUrl, decodeTrackName } from '../lib/supabase.js';
+import { synthesizeRecorrido, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -101,6 +102,7 @@ const el = {
   smCorredor: $('smCorredor'),
   smCorredorNew: $('smCorredorNew'),
   btnExportExcel: $('btnExportExcel'),
+  btnExportExcel4: $('btnExportExcel4'),
   // Recorridos list
   recorridosBox:   $('recorridosBox'),
   recorridosCount: $('recorridosCount'),
@@ -329,6 +331,7 @@ function bindEvents() {
   if (el.btnAutoSubtramos)  el.btnAutoSubtramos.addEventListener('click', autoDetectSubtramos);
   if (el.btnClearSubtramos) el.btnClearSubtramos.addEventListener('click', clearSubtramos);
   if (el.btnExportExcel)    el.btnExportExcel.addEventListener('click', exportExcel);
+  if (el.btnExportExcel4)   el.btnExportExcel4.addEventListener('click', exportExcelConCuarto);
   if (el.btnRefreshPreview) el.btnRefreshPreview.addEventListener('click', renderPreviewTable);
 
   // Tabs
@@ -1636,7 +1639,7 @@ function showBadge(text, type) {
   el.processBadge.querySelector('span:last-child').textContent = text;
 }
 
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 3000) {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
@@ -1645,7 +1648,7 @@ function showToast(message, type = 'info') {
   setTimeout(() => {
     toast.style.animation = 'fade-in 0.3s var(--ease-out) reverse';
     setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  }, duration);
 }
 
 // ── Subtramos editor (global list, shared across recorridos) ──
@@ -1991,14 +1994,18 @@ function currentStudy() {
   return { corredor: value };
 }
 
-function computeExportRows() {
-  if (!recorridos.length || !subtramos.length) return [];
+// `list` permite exportar un conjunto distinto al que está cargado en la
+// interfaz (p. ej. el set de 4 recorridos con el cuarto generado). Cuando un
+// recorrido trae `consecutivo`, ese número manda sobre el índice global —
+// así el 4º generado se numera dentro de su grupo y no de la lista completa.
+function computeExportRows(list = recorridos) {
+  if (!list.length || !subtramos.length) return [];
   const threshold = parseFloat(el.thresholdInput.value) || 50;
   const study = currentStudy();
 
   const rows = [];
-  recorridos.forEach((rec, ri) => {
-    const consecutivo = ri + 1;
+  list.forEach((rec, ri) => {
+    const consecutivo = rec.consecutivo || (ri + 1);
     const hits = subtramoRowsForRecorrido(rec, threshold);
     for (const h of hits) {
       const matched = h.matched;
@@ -2061,25 +2068,9 @@ function renderPreviewTable() {
   el.previewMeta.textContent = `${rows.length} filas · ${recs} recorrido(s) · ${active} subtramo(s) activos`;
 }
 
-function exportExcel() {
-  if (typeof XLSX === 'undefined') {
-    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
-    return;
-  }
-  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
-  if (!subtramos.length)  { showToast('Define al menos un subtramo.', 'warning'); return; }
-
-  const rows = computeExportRows();
-  if (!rows.length) {
-    showToast('Ningún subtramo activo pudo matchearse con los recorridos cargados. Revisa nodos y umbral.', 'warning');
-    return;
-  }
-  const study = currentStudy();
-
-  // Sheet name = TIPICO / ATIPICO based on first recorrido's weekday
-  const sheetName = diaClasificacion(recorridos[0].startTs) || 'RECORRIDOS';
-
-  // Build sheet and apply styles
+// Escribe el .xlsx con el formato acordado (encabezado azul, cebra, filtros).
+// Compartido por la exportación normal y por la del cuarto recorrido.
+function writeStyledWorkbook(rows, { sheetName, filename }) {
   const aoa = [EXCEL_HEADERS, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = EXCEL_COL_WIDTHS.map((w) => ({ wch: w }));
@@ -2125,11 +2116,129 @@ function exportExcel() {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-  const stamp = new Date(recorridos[0].startTs || Date.now()).toISOString().slice(0, 10);
-  const filename = `VEL_TRAFING_${corredorSlug(study.corredor)}_${stamp}.xlsx`;
   XLSX.writeFile(wb, filename);
+}
+
+function exportExcel() {
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
+  if (!subtramos.length)  { showToast('Define al menos un subtramo.', 'warning'); return; }
+
+  const rows = computeExportRows();
+  if (!rows.length) {
+    showToast('Ningún subtramo activo pudo matchearse con los recorridos cargados. Revisa nodos y umbral.', 'warning');
+    return;
+  }
+  const study = currentStudy();
+  const stamp = new Date(recorridos[0].startTs || Date.now()).toISOString().slice(0, 10);
+
+  writeStyledWorkbook(rows, {
+    // Hoja = TIPICO / ATIPICO según el día de la semana del primer recorrido.
+    sheetName: diaClasificacion(recorridos[0].startTs) || 'RECORRIDOS',
+    filename: `VEL_TRAFING_${corredorSlug(study.corredor)}_${stamp}.xlsx`,
+  });
   showToast(`${rows.length} filas exportadas`, 'success');
+}
+
+// ── Cuarto recorrido generado ────────────────────────────────
+// La metodología pide 4 recorridos por día · período · calzada · tipo de
+// vehículo dentro de las 3 horas de la HMD. Cuando el tráfico impide cerrar
+// el cuarto dentro del período, se deriva de los 3 previos (ver lib/synth.js)
+// y el reporte sale con los 3 reales + el generado.
+const SYNTH_TIME_VARIATION = 0.03;  // ±3 % sobre el tiempo promedio
+const SYNTH_POS_JITTER_M   = 2;     // metros de perturbación sobre el trazado promedio
+
+function groupRecorridosPorHmd(list) {
+  const groups = new Map();
+  for (const rec of list) {
+    const key = recorridoGroupKey(rec);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(rec);
+  }
+  for (const arr of groups.values()) arr.sort((a, b) => a.startTs - b.startTs);
+  return groups;
+}
+
+// Construye la lista a exportar: por cada grupo, sus recorridos reales
+// numerados 1..n y, si tiene exactamente 3, el cuarto generado.
+function buildSetConCuarto() {
+  const out = [];
+  const generados = [];
+  const incompletos = [];
+
+  for (const [key, arr] of groupRecorridosPorHmd(recorridos)) {
+    // Ya cumple la metodología: se entregan los 4 reales, sin generar nada.
+    const reales = arr.slice(0, 4);
+    reales.forEach((rec, i) => out.push({ ...rec, consecutivo: i + 1 }));
+
+    if (arr.length >= 4) continue;
+    if (arr.length < 3) { incompletos.push({ key, count: arr.length }); continue; }
+
+    const synth = synthesizeRecorrido(arr, {
+      timeVariation: SYNTH_TIME_VARIATION,
+      posJitter: SYNTH_POS_JITTER_M,
+    });
+    if (!synth) { incompletos.push({ key, count: arr.length }); continue; }
+
+    const base = arr[arr.length - 1];
+    out.push({
+      id: `synth-${base.id}`,
+      name: `Recorrido 4 (generado)`,
+      points: synth.points,
+      startTs: synth.startTs,
+      sourceUrl: '',            // sin track en la nube: la celda LINK va vacía
+      cloudId: '',
+      tipo: base.tipo,
+      calzada: base.calzada,
+      periodo: base.periodo,
+      consecutivo: 4,
+      synthetic: true,
+    });
+    generados.push({ key, meta: synth.meta });
+  }
+
+  return { list: out, generados, incompletos };
+}
+
+function exportExcelConCuarto() {
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  if (!recorridos.length) { showToast('Carga al menos un recorrido antes de exportar.', 'warning'); return; }
+  if (!subtramos.length)  { showToast('Define al menos un subtramo.', 'warning'); return; }
+
+  const { list, generados, incompletos } = buildSetConCuarto();
+
+  if (!generados.length && !incompletos.length) {
+    showToast('Todos los grupos ya tienen 4 recorridos; no había nada que generar.', 'warning');
+  }
+  if (!generados.length && incompletos.length) {
+    const detalle = incompletos.map((g) => `${g.key} (${g.count})`).join(' · ');
+    showToast(`Se requieren 3 recorridos por grupo para generar el cuarto. Faltan: ${detalle}`, 'warning', 8000);
+    return;
+  }
+
+  const rows = computeExportRows(list);
+  if (!rows.length) {
+    showToast('Ningún subtramo activo pudo matchearse con los recorridos. Revisa nodos y umbral.', 'warning');
+    return;
+  }
+
+  const study = currentStudy();
+  const stamp = new Date(list[0].startTs || Date.now()).toISOString().slice(0, 10);
+
+  writeStyledWorkbook(rows, {
+    sheetName: diaClasificacion(list[0].startTs) || 'RECORRIDOS',
+    filename: `VEL_TRAFING_${corredorSlug(study.corredor)}_${stamp}_4R.xlsx`,
+  });
+
+  let msg = `${rows.length} filas · cuarto recorrido generado en ${generados.length} grupo(s)`;
+  if (incompletos.length) msg += ` · ${incompletos.length} grupo(s) sin los 3 recorridos requeridos`;
+  showToast(msg, 'success', 7000);
 }
 
 // ── Boot ─────────────────────────────────────────────────────
