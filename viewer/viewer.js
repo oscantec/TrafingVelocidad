@@ -2151,24 +2151,29 @@ function exportExcel() {
 const SYNTH_TIME_VARIATION = 0.03;  // ±3 % sobre el tiempo promedio
 const SYNTH_POS_JITTER_M   = 2;     // metros de perturbación sobre el trazado promedio
 
-// El generado se marca por partida doble:
-//   · `*` al inicio  → salta a la vista en la lista de la nube.
-//   · ` X` al final  → sobrevive a `slugify` (que descarta los símbolos),
-//                      así que el enlace tampoco queda igual al del
-//                      recorrido 4 real cuando ese existe.
-const SYNTH_NAME_MARK   = '*';
-const SYNTH_NAME_SUFFIX = 'X';
-// Tope del nombre base: `slugify` corta el slug a 40 caracteres y la X debe
-// sobrevivir al recorte.
-const SYNTH_BASE_MAX = 36;
+// El generado se marca con `*` al inicio del nombre. `buildTrackShareUrl`
+// traduce esa marca a un guion bajo extra en el enlace (…_202608081348__CIRCUITO_8),
+// así que ni el nombre ni la URL se confunden con un recorrido real.
+const SYNTH_NAME_MARK = '*';
 
 const nombreSinMarca = (name) => String(name || '')
   .replace(/^[*\s]+/, '')
-  .replace(new RegExp(`\\s+${SYNTH_NAME_SUFFIX}$`, 'i'), '')
+  .replace(/\s+X$/, '')   // limpia el sufijo que usaba la versión anterior
   .trim();
 
-const nombreGenerado = (baseName) =>
-  `${SYNTH_NAME_MARK}${nombreSinMarca(baseName).slice(0, SYNTH_BASE_MAX).trim()} ${SYNTH_NAME_SUFFIX}`;
+// Los recorridos van numerados al final del nombre ("CIRCUITO 7"), así que
+// el derivado continúa la serie: 5·6·7 → 8, 1·2·3 → 4. Conserva el relleno
+// de ceros ("CIRCUITO 07" → "CIRCUITO 08"). Si el nombre no termina en
+// número se deja igual: la marca `*` ya lo distingue.
+function nombreSiguiente(name) {
+  const base = nombreSinMarca(name);
+  const m = /^(.*?)(\d+)(\D*)$/.exec(base);
+  if (!m) return base;
+  const siguiente = String(Number(m[2]) + 1).padStart(m[2].length, '0');
+  return `${m[1]}${siguiente}${m[3]}`;
+}
+
+const nombreGenerado = (baseName) => `${SYNTH_NAME_MARK}${nombreSiguiente(baseName)}`;
 
 const esRecorridoGenerado = (rec) =>
   rec.synthetic === true || String(rec.name || '').trimStart().startsWith(SYNTH_NAME_MARK);
