@@ -2151,6 +2151,15 @@ function exportExcel() {
 const SYNTH_TIME_VARIATION = 0.03;  // ±3 % sobre el tiempo promedio
 const SYNTH_POS_JITTER_M   = 2;     // metros de perturbación sobre el trazado promedio
 
+// Marca que antepone al nombre del generado. Va al inicio para que salte a
+// la vista en la lista de la nube y no se confunda con un recorrido 4 real.
+// `slugify` la descarta al armar la URL, así que el enlace no la arrastra.
+const SYNTH_NAME_MARK = '*';
+
+const nombreSinMarca = (name) => String(name || '').replace(/^[*\s]+/, '');
+const esRecorridoGenerado = (rec) =>
+  rec.synthetic === true || String(rec.name || '').trimStart().startsWith(SYNTH_NAME_MARK);
+
 function groupRecorridosPorHmd(list) {
   const groups = new Map();
   for (const rec of list) {
@@ -2170,26 +2179,28 @@ function buildSetConCuarto() {
   const incompletos = [];
 
   for (const [key, arr] of groupRecorridosPorHmd(recorridos)) {
-    // Ya cumple la metodología: se entregan los 4 reales, sin generar nada.
-    const reales = arr.slice(0, 4);
-    reales.forEach((rec, i) => out.push({ ...rec, consecutivo: i + 1 }));
-
+    // Ya cumple la metodología: se entregan los 4 que haya, sin generar nada.
+    arr.slice(0, 4).forEach((rec, i) => out.push({ ...rec, consecutivo: i + 1 }));
     if (arr.length >= 4) continue;
-    if (arr.length < 3) { incompletos.push({ key, count: arr.length }); continue; }
 
-    const synth = synthesizeRecorrido(arr, {
+    // Un generado nunca sirve de fuente para otro: si en el grupo hay uno
+    // de una exportación anterior, se excluye del promedio.
+    const fuentes = arr.filter((r) => !esRecorridoGenerado(r));
+    if (fuentes.length < 3) { incompletos.push({ key, count: fuentes.length }); continue; }
+
+    const synth = synthesizeRecorrido(fuentes, {
       timeVariation: SYNTH_TIME_VARIATION,
       posJitter: SYNTH_POS_JITTER_M,
     });
-    if (!synth) { incompletos.push({ key, count: arr.length }); continue; }
+    if (!synth) { incompletos.push({ key, count: fuentes.length }); continue; }
 
-    const base = arr[arr.length - 1];
+    const base = fuentes[fuentes.length - 1];
     const rec = {
       id: synth.meta.localId,
-      // El nombre viaja al slug del enlace y a la lista "Cargar desde la
-      // nube", así que lleva el marcador R4 GEN: quien vea el track en
-      // Supabase debe poder distinguirlo de uno medido en campo.
-      name: `${base.name} R4 GEN`,
+      // Marcador al inicio del nombre para que no se confunda con un
+      // recorrido 4 realmente medido. `slugify` descarta el símbolo, así
+      // que el enlace del visor sale limpio y el reporte se renombra aparte.
+      name: `${SYNTH_NAME_MARK}${nombreSinMarca(base.name)}`,
       points: synth.points,
       startTs: synth.startTs,
       endTs: synth.endTs,
