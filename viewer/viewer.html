@@ -1067,6 +1067,10 @@
                         title="Genera el 4º recorrido de cada grupo (día · período · calzada · tipo) a partir de los 3 previos y exporta los 4 a Excel">
                   Exportar con 4º recorrido
                 </button>
+                <button class="btn btn-primary" id="btnGenerarNew"
+                        title="Replica los recorridos cargados en otra fecha, con variación en horas de paso, posiciones y velocidades">
+                  Generar NEW
+                </button>
               </div>
             </div>
             <div id="previewEmpty" class="empty-state">
@@ -1210,6 +1214,28 @@
         <div class="modal-actions">
           <button class="btn btn-secondary" id="stCancel">Cancelar</button>
           <button class="btn btn-primary" id="stSave">Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generar NEW: replica los recorridos cargados en otra fecha -->
+    <div class="modal-overlay" id="newDateModal">
+      <div class="modal" style="max-width:460px;">
+        <div class="modal-title">Generar recorridos en otra fecha</div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="newDateInput">Fecha de los nuevos recorridos</label>
+            <input type="date" id="newDateInput" class="form-input">
+          </div>
+          <div class="text-xs text-muted" id="newDateHint">—</div>
+          <div class="text-xs" style="color:var(--ui-orange);margin-top:8px;">
+            Se conserva la hora del día de cada recorrido; cambian la fecha y,
+            ligeramente, horas de paso, posiciones y velocidades.
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="newDateCancel">Cancelar</button>
+          <button class="btn btn-primary" id="newDateConfirm">Generar</button>
         </div>
       </div>
     </div>

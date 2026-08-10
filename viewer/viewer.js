@@ -17,7 +17,7 @@ import { listCloudTracks, getCloudTrackPoints, testConnection,
          listSubtramosByTramo,
          saveTramoComplete, deleteTramo, publishDerivedTrack,
          buildTrackShareUrl, encodeTrackName, decodeTrackName } from '../lib/supabase.js';
-import { synthesizeRecorrido, recorridoGroupKey } from '../lib/synth.js';
+import { synthesizeRecorrido, deriveVariant, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 
 // ── State ────────────────────────────────────────────────────
@@ -103,6 +103,12 @@ const el = {
   smCorredorNew: $('smCorredorNew'),
   btnExportExcel: $('btnExportExcel'),
   btnExportExcel4: $('btnExportExcel4'),
+  btnGenerarNew:   $('btnGenerarNew'),
+  newDateModal:    $('newDateModal'),
+  newDateInput:    $('newDateInput'),
+  newDateHint:     $('newDateHint'),
+  newDateCancel:   $('newDateCancel'),
+  newDateConfirm:  $('newDateConfirm'),
   // Recorridos list
   recorridosBox:   $('recorridosBox'),
   recorridosCount: $('recorridosCount'),
@@ -332,6 +338,14 @@ function bindEvents() {
   if (el.btnClearSubtramos) el.btnClearSubtramos.addEventListener('click', clearSubtramos);
   if (el.btnExportExcel)    el.btnExportExcel.addEventListener('click', exportExcel);
   if (el.btnExportExcel4)   el.btnExportExcel4.addEventListener('click', exportExcelConCuarto);
+  if (el.btnGenerarNew)     el.btnGenerarNew.addEventListener('click', abrirModalNuevaFecha);
+  if (el.newDateCancel)     el.newDateCancel.addEventListener('click', () => el.newDateModal.classList.remove('active'));
+  if (el.newDateConfirm)    el.newDateConfirm.addEventListener('click', generarRecorridosEnNuevaFecha);
+  if (el.newDateModal) {
+    el.newDateModal.addEventListener('click', (e) => {
+      if (e.target === el.newDateModal) el.newDateModal.classList.remove('active');
+    });
+  }
   if (el.btnRefreshPreview) el.btnRefreshPreview.addEventListener('click', renderPreviewTable);
 
   // Tabs
@@ -2323,6 +2337,134 @@ async function exportExcelConCuarto() {
 
   // Refresca el desplegable de la nube para que el generado aparezca ahí.
   if (generados.length > fallidos) refreshCloudTracks().catch(() => {});
+}
+
+// ── Generar NEW: replicar los recorridos cargados en otra fecha ──
+// Cuando el cronograma no alcanza, se toma un día ya medido y se lleva a
+// otra fecha con variación, de modo que el nuevo día no sea una copia.
+const NEW_TIME_VARIATION = 0.05;  // ±5 % en los tiempos entre puntos
+const NEW_POS_JITTER_M   = 3;     // metros de perturbación del trazado
+const NEW_START_SHIFT_S  = 180;   // ±3 min en la hora de arranque
+
+const isoDate = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function abrirModalNuevaFecha() {
+  if (!recorridos.length) {
+    showToast('Carga primero los recorridos que quieres replicar.', 'warning');
+    return;
+  }
+  // Por defecto, el día siguiente al último recorrido cargado.
+  const siguiente = new Date(Math.max(...recorridos.map((r) => r.startTs)));
+  siguiente.setDate(siguiente.getDate() + 1);
+  el.newDateInput.value = isoDate(siguiente);
+  el.newDateHint.textContent =
+    `Se generarán ${recorridos.length} recorrido(s) a partir de los cargados.`;
+  el.newDateModal.classList.add('active');
+  setTimeout(() => el.newDateInput?.focus(), 50);
+}
+
+// Corre todos los puntos de un recorrido `deltaMs` hacia adelante.
+function desplazarRecorrido(rec, deltaMs) {
+  rec.points = rec.points.map((p) => ({ ...p, timestamp: p.timestamp + deltaMs }));
+  rec.startTs += deltaMs;
+  rec.endTs   += deltaMs;
+}
+
+async function generarRecorridosEnNuevaFecha() {
+  const fecha = (el.newDateInput?.value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) { showToast('Elige una fecha válida.', 'warning'); return; }
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería de Excel aún no cargó. Reintenta en un segundo.', 'warning');
+    return;
+  }
+  if (!subtramos.length) { showToast('Define al menos un subtramo.', 'warning'); return; }
+
+  const fuentes = [...recorridos].sort((a, b) => a.startTs - b.startTs);
+  const nuevos = [];
+  for (const src of fuentes) {
+    const v = deriveVariant(src, {
+      date: fecha,
+      timeVariation: NEW_TIME_VARIATION,
+      posJitter: NEW_POS_JITTER_M,
+      startShiftSec: NEW_START_SHIFT_S,
+    });
+    if (!v) continue;
+    nuevos.push({
+      id: v.meta.localId,
+      // Mismo número de recorrido que su fuente: es el mismo recorrido en
+      // otra fecha, no uno que continúe la serie del día.
+      name: `${SYNTH_NAME_MARK}${nombreSinMarca(src.name)}`,
+      points: v.points,
+      startTs: v.startTs,
+      endTs:   v.endTs,
+      sourceUrl: '',
+      cloudId: '',
+      tipo: src.tipo,
+      calzada: src.calzada,
+      periodo: src.periodo,
+      synthetic: true,
+    });
+  }
+
+  if (!nuevos.length) {
+    showToast('Ningún recorrido cargado pudo replicarse (revisa que tengan puntos).', 'warning');
+    return;
+  }
+
+  // El desfase de arranque es independiente por recorrido, así que puede
+  // acercar dos consecutivos. Se preserva la secuencia empujando el que se
+  // solape con el anterior.
+  nuevos.sort((a, b) => a.startTs - b.startTs);
+  for (let i = 1; i < nuevos.length; i++) {
+    const holgura = nuevos[i].startTs - nuevos[i - 1].endTs;
+    if (holgura < 30000) desplazarRecorrido(nuevos[i], 30000 - holgura);
+  }
+
+  // Numeración 1..n dentro de cada grupo del nuevo día.
+  for (const arr of groupRecorridosPorHmd(nuevos).values()) {
+    arr.forEach((rec, i) => { rec.consecutivo = i + 1; });
+  }
+
+  el.newDateModal.classList.remove('active');
+
+  const btn = el.btnGenerarNew;
+  const labelPrev = btn?.textContent;
+  let fallidos = 0;
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Publicando…'; }
+    for (const rec of nuevos) {
+      try {
+        await publicarRecorridoGenerado(rec);
+      } catch (err) {
+        console.error('[Viewer] publish new-date error:', err);
+        fallidos++;
+      }
+    }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = labelPrev; }
+  }
+  if (fallidos === nuevos.length) {
+    showToast('No se pudo publicar ningún recorrido en Supabase; revisa la conexión.', 'error', 8000);
+    return;
+  }
+
+  const rows = computeExportRows(nuevos);
+  if (!rows.length) {
+    showToast('Ningún subtramo activo pudo matchearse con los recorridos generados. Revisa nodos y umbral.', 'warning', 8000);
+    return;
+  }
+
+  const study = currentStudy();
+  writeStyledWorkbook(rows, {
+    sheetName: diaClasificacion(nuevos[0].startTs) || 'RECORRIDOS',
+    filename: `VEL_TRAFING_${corredorSlug(study.corredor)}_${fecha}_NEW.xlsx`,
+  });
+
+  let msg = `${nuevos.length - fallidos} recorrido(s) generados para el ${fecha} · ${rows.length} filas`;
+  if (fallidos) msg += ` · ${fallidos} sin publicar (LINK vacío)`;
+  showToast(msg, fallidos ? 'warning' : 'success', 8000);
+  refreshCloudTracks().catch(() => {});
 }
 
 // ── Boot ─────────────────────────────────────────────────────
