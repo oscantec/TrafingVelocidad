@@ -2157,7 +2157,7 @@ function exportExcel() {
   showToast(`${rows.length} filas exportadas`, 'success');
 }
 
-// ── Cuarto recorrido generado ────────────────────────────────
+// ── Reporte A: cuarto recorrido generado ─────────────────────
 // La metodología pide 4 recorridos por día · período · calzada · tipo de
 // vehículo dentro de las 3 horas de la HMD. Cuando el tráfico impide cerrar
 // el cuarto dentro del período, se deriva de los 3 previos (ver lib/synth.js)
@@ -2339,7 +2339,7 @@ async function exportExcelConCuarto() {
   if (generados.length > fallidos) refreshCloudTracks().catch(() => {});
 }
 
-// ── Generar NEW: replicar los recorridos cargados en otra fecha ──
+// ── Reporte B: replicar los recorridos cargados en otra fecha ──
 // Cuando el cronograma no alcanza, se toma un día ya medido y se lleva a
 // otra fecha con variación, de modo que el nuevo día no sea una copia.
 const NEW_TIME_VARIATION = 0.05;  // ±5 % en los tiempos entre puntos
