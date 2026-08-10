@@ -41,9 +41,10 @@ alter table public.tracks     enable row level security;
 alter table public.gps_points enable row level security;
 
 drop policy if exists "anon read  tracks"     on public.tracks;
-drop policy if exists "anon write tracks"     on public.tracks;
-drop policy if exists "anon read  gps_points" on public.gps_points;
-drop policy if exists "anon write gps_points" on public.gps_points;
+drop policy if exists "anon write tracks"      on public.tracks;
+drop policy if exists "anon read  gps_points"  on public.gps_points;
+drop policy if exists "anon write gps_points"  on public.gps_points;
+drop policy if exists "anon delete gps_points" on public.gps_points;
 
 create policy "anon read  tracks"
   on public.tracks     for select using (true);
@@ -56,6 +57,11 @@ create policy "anon read  gps_points"
   on public.gps_points for select using (true);
 create policy "anon write gps_points"
   on public.gps_points for insert with check (true);
+-- Sin esta política, el borrado previo de syncTrackToCloud no afecta
+-- ninguna fila (RLS lo filtra en silencio, sin error) y re-sincronizar el
+-- mismo track duplica sus puntos.
+create policy "anon delete gps_points"
+  on public.gps_points for delete using (true);
 
 -- ══════════════════════════════════════════════════════════
 --  Tramificación — Corredor → Tramo → Puntos de control

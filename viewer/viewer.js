@@ -15,7 +15,7 @@ import { parseGPX, parseKML, parseGeoJSON, parseTrackContent, parseNodesFile, re
 import { listCloudTracks, getCloudTrackPoints, testConnection,
          listTramos, listCorridors, createCorridor, listControlPointsByTramo,
          listSubtramosByTramo,
-         saveTramoComplete, deleteTramo, syncTrackToCloud,
+         saveTramoComplete, deleteTramo, publishDerivedTrack,
          buildTrackShareUrl, encodeTrackName, decodeTrackName } from '../lib/supabase.js';
 import { synthesizeRecorrido, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
@@ -2179,14 +2179,16 @@ function buildSetConCuarto() {
   const incompletos = [];
 
   for (const [key, arr] of groupRecorridosPorHmd(recorridos)) {
-    // Ya cumple la metodología: se entregan los 4 que haya, sin generar nada.
-    arr.slice(0, 4).forEach((rec, i) => out.push({ ...rec, consecutivo: i + 1 }));
-    if (arr.length >= 4) continue;
-
     // Un generado nunca sirve de fuente para otro: si en el grupo hay uno
     // de una exportación anterior, se excluye del promedio.
-    const fuentes = arr.filter((r) => !esRecorridoGenerado(r));
-    if (fuentes.length < 3) { incompletos.push({ key, count: fuentes.length }); continue; }
+    const reales = arr.filter((r) => !esRecorridoGenerado(r));
+    if (reales.length < 3) { incompletos.push({ key, count: reales.length }); continue; }
+
+    // El reporte es siempre "los 3 previos + el cuarto derivado", tenga el
+    // grupo 3 recorridos o ya los 4: cuando el cuarto real existe se deja
+    // fuera del reporte y el derivado sale marcado para no confundirlos.
+    const fuentes = reales.slice(0, 3);
+    fuentes.forEach((rec, i) => out.push({ ...rec, consecutivo: i + 1 }));
 
     const synth = synthesizeRecorrido(fuentes, {
       timeVariation: SYNTH_TIME_VARIATION,
@@ -2224,7 +2226,7 @@ function buildSetConCuarto() {
 // upsert va contra un local_id determinista, así que reexportar actualiza
 // el mismo registro en lugar de sembrar duplicados.
 async function publicarRecorridoGenerado(rec) {
-  const res = await syncTrackToCloud({
+  const res = await publishDerivedTrack({
     id:        rec.id,
     name:      encodeTrackName(rec.name, rec.tipo, rec.calzada, rec.periodo),
     startTime: rec.startTs,
