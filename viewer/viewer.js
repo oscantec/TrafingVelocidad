@@ -2151,12 +2151,25 @@ function exportExcel() {
 const SYNTH_TIME_VARIATION = 0.03;  // ±3 % sobre el tiempo promedio
 const SYNTH_POS_JITTER_M   = 2;     // metros de perturbación sobre el trazado promedio
 
-// Marca que antepone al nombre del generado. Va al inicio para que salte a
-// la vista en la lista de la nube y no se confunda con un recorrido 4 real.
-// `slugify` la descarta al armar la URL, así que el enlace no la arrastra.
-const SYNTH_NAME_MARK = '*';
+// El generado se marca por partida doble:
+//   · `*` al inicio  → salta a la vista en la lista de la nube.
+//   · ` X` al final  → sobrevive a `slugify` (que descarta los símbolos),
+//                      así que el enlace tampoco queda igual al del
+//                      recorrido 4 real cuando ese existe.
+const SYNTH_NAME_MARK   = '*';
+const SYNTH_NAME_SUFFIX = 'X';
+// Tope del nombre base: `slugify` corta el slug a 40 caracteres y la X debe
+// sobrevivir al recorte.
+const SYNTH_BASE_MAX = 36;
 
-const nombreSinMarca = (name) => String(name || '').replace(/^[*\s]+/, '');
+const nombreSinMarca = (name) => String(name || '')
+  .replace(/^[*\s]+/, '')
+  .replace(new RegExp(`\\s+${SYNTH_NAME_SUFFIX}$`, 'i'), '')
+  .trim();
+
+const nombreGenerado = (baseName) =>
+  `${SYNTH_NAME_MARK}${nombreSinMarca(baseName).slice(0, SYNTH_BASE_MAX).trim()} ${SYNTH_NAME_SUFFIX}`;
+
 const esRecorridoGenerado = (rec) =>
   rec.synthetic === true || String(rec.name || '').trimStart().startsWith(SYNTH_NAME_MARK);
 
@@ -2199,10 +2212,7 @@ function buildSetConCuarto() {
     const base = fuentes[fuentes.length - 1];
     const rec = {
       id: synth.meta.localId,
-      // Marcador al inicio del nombre para que no se confunda con un
-      // recorrido 4 realmente medido. `slugify` descarta el símbolo, así
-      // que el enlace del visor sale limpio y el reporte se renombra aparte.
-      name: `${SYNTH_NAME_MARK}${nombreSinMarca(base.name)}`,
+      name: nombreGenerado(base.name),
       points: synth.points,
       startTs: synth.startTs,
       endTs: synth.endTs,
