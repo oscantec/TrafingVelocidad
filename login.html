@@ -153,7 +153,7 @@
 </div>
 
 <script type="module">
-  import { login, verifyMfa, checkAuth, logout } from './lib/auth.js';
+  import { login, verifyMfa, checkAuth, logout, getAuthErrorMessage } from './lib/auth.js';
 
   // Si ya está logueado, redirigir
   checkAuth();
@@ -203,11 +203,7 @@
       sessionStorage.removeItem('returnTo');
       window.location.href = returnTo;
     } catch (err) {
-      if (err && err.code === 'no_access') {
-        errorMsg.textContent = err.message || 'Tu cuenta no tiene acceso a este módulo.';
-      } else {
-        errorMsg.textContent = 'Correo o contraseña incorrectos.';
-      }
+      errorMsg.textContent = getAuthErrorMessage(err);
       passwordInput.value = '';
     } finally {
       submitBtn.disabled = false;
@@ -236,7 +232,7 @@
       sessionStorage.removeItem('returnTo');
       window.location.href = returnTo;
     } catch (err) {
-      mfaError.textContent = 'Código incorrecto o expirado.';
+      mfaError.textContent = getAuthErrorMessage(err);
       codeInput.value = '';
       codeInput.focus();
     } finally {
