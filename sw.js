@@ -4,7 +4,7 @@
  * (browsers do not expose geolocation to service workers).
  */
 
-const CACHE = 'stfvel-v12';
+const CACHE = 'stfvel-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const ASSETS = [
   './viewer/viewer.js',
   './viewer/playback.js',
   './css/styles.css',
+  './lib/basemap.js',
   './lib/db.js',
   './lib/geo.js',
   './lib/gpx.js',

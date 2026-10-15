@@ -7,6 +7,7 @@
 
 import { listCloudTracks, getCloudTrackPoints, decodeTrackName } from '../lib/supabase.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
+import { addBasemap } from '../lib/basemap.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -20,10 +21,7 @@ function initMap() {
     zoom: 13,
     zoomControl: true,
   });
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  }).addTo(map);
+  addBasemap(map, { maxZoom: 19 });
 }
 
 function mapToken(name) {

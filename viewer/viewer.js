@@ -19,6 +19,7 @@ import { listCloudTracks, getCloudTrackPoints, testConnection,
          buildTrackShareUrl, encodeTrackName, decodeTrackName } from '../lib/supabase.js';
 import { synthesizeRecorrido, deriveVariant, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
+import { addBasemap } from '../lib/basemap.js';
 
 // ── State ────────────────────────────────────────────────────
 let trackPoints = [];       // Current track points
@@ -203,12 +204,7 @@ function initMap() {
     zoomControl: true,
   });
 
-  // Standard basemap; no provider API key is required.
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxNativeZoom: 19,
-    maxZoom: 20,
-  }).addTo(map);
+  addBasemap(map);
 
   setTimeout(() => map.invalidateSize(), 100);
 }

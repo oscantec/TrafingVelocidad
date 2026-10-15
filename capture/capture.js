@@ -10,6 +10,7 @@ import { haversineDistance, totalDistance, formatDistance, formatDuration, forma
 import { generateGPX, downloadGPX, downloadJSON } from '../lib/gpx.js';
 import { syncTrackToCloud, testConnection, testWritePermission, buildTrackShareUrl,
          encodeTrackName, decodeTrackName } from '../lib/supabase.js';
+import { addBasemap } from '../lib/basemap.js';
 
 // ── State ────────────────────────────────────────────────────
 const STATE = {
@@ -186,12 +187,7 @@ function initMap() {
     attributionControl: true,
   });
 
-  // Standard basemap; no provider API key is required.
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxNativeZoom: 19,
-    maxZoom: 20,
-  }).addTo(map);
+  addBasemap(map);
 
   trackPolyline = L.polyline([], {
     color: ACCENT,
