@@ -4,7 +4,7 @@
  * (browsers do not expose geolocation to service workers).
  */
 
-const CACHE = 'stfvel-v14';
+const CACHE = 'stfvel-v15';
 const ASSETS = [
   './',
   './index.html',
