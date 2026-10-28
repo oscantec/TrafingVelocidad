@@ -78,6 +78,33 @@ test('AM, PM and different vehicle groups are scheduled independently', () => {
   checkSchedule(source, scheduleVariants(source));
 });
 
+test('end-to-next-start waits differ from the historical waits, not just departure times', () => {
+  for (let day = 1; day <= 200; day++) {
+    const source = group(day);
+    const result = scheduleVariants(source);
+    for (let i = 1; i < result.length; i++) {
+      const historicalWait = source[i].startTs - source[i - 1].endTs;
+      const newWait = result[i].startTs - result[i - 1].endTs;
+      assert.ok(Math.abs(newWait - historicalWait) >= 90000);
+      assert.equal(result[i].scheduleMeta.referenceGapSec, historicalWait / 1000);
+      assert.equal(result[i].scheduleMeta.generatedGapSec, newWait / 1000);
+      assert.equal(result[i].scheduleMeta.version, 'schedule-v2');
+      assert.match(result[i].id, /-schedule-v2-/);
+    }
+  }
+});
+
+test('the wait comparison uses the original source duration before speed variation', () => {
+  const source = group().map((rec) => ({ ...rec, referenceDurationMs: 9 * 60000 }));
+  const result = scheduleVariants(source);
+  checkSchedule(source, result);
+  for (let i = 1; i < result.length; i++) {
+    const historicalWait = source[i].startTs - source[i - 1].startTs - source[i - 1].referenceDurationMs;
+    const newWait = result[i].startTs - result[i - 1].endTs;
+    assert.ok(Math.abs(newWait - historicalWait) >= 90000);
+  }
+});
+
 test('impossible schedules fail instead of exceeding the shift or overlapping', () => {
   const source = group(1, { count: 12, gap: 6, duration: 5.9 });
   const snapshot = structuredClone(source);

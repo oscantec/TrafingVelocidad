@@ -2392,6 +2392,8 @@ async function generarRecorridosEnNuevaFecha() {
       points: v.points,
       startTs: v.startTs,
       endTs:   v.endTs,
+      // Pausa real de la base, antes de variar la duración del recorrido.
+      referenceDurationMs: src.points[src.points.length - 1].timestamp - src.points[0].timestamp,
       sourceUrl: '',
       cloudId: '',
       tipo: src.tipo,
