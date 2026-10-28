@@ -2,5 +2,7 @@
   "name": "trafingvelocidad",
   "version": "1.0.0",
   "description": "Sistema de Tracking GPS y Segmentación de Tramos",
-  "scripts": {}
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
 }

@@ -17,7 +17,7 @@ import { listCloudTracks, getCloudTrackPoints, testConnection,
          listSubtramosByTramo,
          saveTramoComplete, deleteTramo, publishDerivedTrack,
          buildTrackShareUrl, encodeTrackName, decodeTrackName } from '../lib/supabase.js';
-import { synthesizeRecorrido, deriveVariant, recorridoGroupKey } from '../lib/synth.js';
+import { synthesizeRecorrido, deriveVariant, scheduleVariants, recorridoGroupKey } from '../lib/synth.js';
 import { initPlayback, loadPlaybackTrack } from './playback.js';
 import { addBasemap } from '../lib/basemap.js';
 
@@ -2340,7 +2340,7 @@ async function exportExcelConCuarto() {
 // otra fecha con variación, de modo que el nuevo día no sea una copia.
 const NEW_TIME_VARIATION = 0.05;  // ±5 % en los tiempos entre puntos
 const NEW_POS_JITTER_M   = 3;     // metros de perturbación del trazado
-const NEW_START_SHIFT_S  = 180;   // ±3 min en la hora de arranque
+const NEW_START_SHIFT_S  = 300;   // ±5 min; el primero se desplaza 3–4 min hacia adelante
 
 const isoDate = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -2354,17 +2354,14 @@ function abrirModalNuevaFecha() {
   const siguiente = new Date(Math.max(...recorridos.map((r) => r.startTs)));
   siguiente.setDate(siguiente.getDate() + 1);
   el.newDateInput.value = isoDate(siguiente);
+  const sourceDates = recorridos.map((r) => r.startTs);
+  const firstSourceDate = new Date(Math.min(...sourceDates)).toLocaleDateString('es-CO');
+  const lastSourceDate = new Date(Math.max(...sourceDates)).toLocaleDateString('es-CO');
   el.newDateHint.textContent =
-    `Se generarán ${recorridos.length} recorrido(s) a partir de los cargados.`;
+    `Base cargada: ${firstSourceDate}${firstSourceDate === lastSourceDate ? '' : `–${lastSourceDate}`}. ` +
+    `Se generarán ${recorridos.length} recorrido(s) sintético(s).`;
   el.newDateModal.classList.add('active');
   setTimeout(() => el.newDateInput?.focus(), 50);
-}
-
-// Corre todos los puntos de un recorrido `deltaMs` hacia adelante.
-function desplazarRecorrido(rec, deltaMs) {
-  rec.points = rec.points.map((p) => ({ ...p, timestamp: p.timestamp + deltaMs }));
-  rec.startTs += deltaMs;
-  rec.endTs   += deltaMs;
 }
 
 async function generarRecorridosEnNuevaFecha() {
@@ -2377,13 +2374,14 @@ async function generarRecorridosEnNuevaFecha() {
   if (!subtramos.length) { showToast('Define al menos un subtramo.', 'warning'); return; }
 
   const fuentes = [...recorridos].sort((a, b) => a.startTs - b.startTs);
-  const nuevos = [];
+  let nuevos = [];
   for (const src of fuentes) {
     const v = deriveVariant(src, {
       date: fecha,
       timeVariation: NEW_TIME_VARIATION,
       posJitter: NEW_POS_JITTER_M,
-      startShiftSec: NEW_START_SHIFT_S,
+      // El horario se asigna al conjunto completo, dentro de sus rangos.
+      startShiftSec: 0,
     });
     if (!v) continue;
     nuevos.push({
@@ -2408,13 +2406,11 @@ async function generarRecorridosEnNuevaFecha() {
     return;
   }
 
-  // El desfase de arranque es independiente por recorrido, así que puede
-  // acercar dos consecutivos. Se preserva la secuencia empujando el que se
-  // solape con el anterior.
-  nuevos.sort((a, b) => a.startTs - b.startTs);
-  for (let i = 1; i < nuevos.length; i++) {
-    const holgura = nuevos[i].startTs - nuevos[i - 1].endTs;
-    if (holgura < 30000) desplazarRecorrido(nuevos[i], 30000 - holgura);
+  try {
+    nuevos = scheduleVariants(nuevos, { startShiftSec: NEW_START_SHIFT_S });
+  } catch (err) {
+    showToast(err.message || 'No se pudieron distribuir las salidas dentro del horario histórico.', 'warning', 8000);
+    return;
   }
 
   // Numeración 1..n dentro de cada grupo del nuevo día.
